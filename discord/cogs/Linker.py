@@ -18,9 +18,6 @@ class LinkerUtility:
 
         self.logger = logging.getLogger("LinkerUtility")
 
-        self.logger.info(f"Linker API URL: {self.linker_api_url}")
-        self.logger.info(f"Linker API Key: {self.linker_api_key}")
-
     async def api_call(self, path, data):
         headers = {
             "Authorization": f"Bearer {self.linker_api_key}"
