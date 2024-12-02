@@ -3,7 +3,7 @@ import logging
 import discord
 import httpx
 from discord.commands import slash_command
-from discord.ext import commands
+from discord.ext import commands, tasks
 from sqlalchemy import select
 
 from config import bot_config
@@ -81,7 +81,7 @@ class LinkerUtility:
         if resp is None:
             return None
 
-        return resp
+        return resp["result"]
 
 
 class StartFlowView(discord.ui.View):
@@ -123,10 +123,18 @@ class StartFlowView(discord.ui.View):
 class Linker(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.logger = logging.getLogger("Linker")
 
     @commands.Cog.listener()
     async def on_ready(self):
         self.bot.add_view(StartFlowView())
+        self.update_roles.start()
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        if not self.update_roles.is_running():
+            self.logger.warning("update_roles task is not running. Starting task.")
+            self.update_roles.start()
 
     @slash_command(name="send_linker_start_button", description="アカウント連携を開始するボタンを送信します")
     @commands.has_permissions(administrator=True)
@@ -145,6 +153,17 @@ class Linker(commands.Cog):
             is_jp_member: discord.Option(bool, "JPメンバーかどうか", required=False, default=None)
     ):
         await ctx.interaction.response.defer(ephemeral=True)
+
+        # is_linkedとis_jp_memberについて、以下に当てはまらないものを弾く
+        # is_linkedがNone / is_jp_memberがNone = 全員
+        # is_linkedがTrue / is_jp_memberがTrue = 連携済みJPメンバー
+        # is_linkedがTrue / is_jp_memberがFalse = 連携済み非JPメンバー
+        # is_linkedがTrue / is_jp_memberがNone = 連携済み
+        # is_linkedがFalse = 未連携
+
+        if (is_linked, is_jp_member) not in [(None, None), (True, True), (True, False), (True, None), (False, None)]:
+            await ctx.interaction.followup.send("is_linkedとis_jp_memberの組み合わせが不正です。")
+            return
 
         with get_db() as session:
             guild = session.execute(select(Guilds).where(Guilds.guild_id == ctx.guild.id))
@@ -200,7 +219,7 @@ class Linker(commands.Cog):
 
             roles = []
             for role in registered_roles:
-                roles.append(f"<&{role.role_id}>: {role.is_linked} {role.is_jp_member}")
+                roles.append(f"<@&{role.role_id}>: {role.is_linked} {role.is_jp_member}")
 
             await ctx.interaction.followup.send("\n".join(roles))
 
@@ -233,6 +252,122 @@ class Linker(commands.Cog):
             session.delete(registered_role)
             session.commit()
             await ctx.interaction.followup.send(f"{role.name} を削除しました。")
+
+    async def update_roles_in_guild(self, guild: discord.Guild):
+        # guildに紐づいたロールを取得
+        with get_db() as session:
+            guild_db = session.execute(select(Guilds).where(Guilds.guild_id == guild.id))
+            guild_db = guild_db.scalar()
+
+            if guild_db is None:
+                return
+
+            registered_roles = session.execute(select(RegisteredRoles).where(RegisteredRoles.guild_id == guild_db.id))
+            registered_roles = registered_roles.scalars().all()
+
+        # guild内のメンバーのIDを取得
+        members = await guild.fetch_members().flatten()
+        member_ids = [member.id for member in members if not member.bot]
+
+        # linker APIでリストを取得
+        linker_util = LinkerUtility()
+        resp = await linker_util.list_accounts([guild.get_member(member_id) for member_id in member_ids])
+
+        if resp is None:
+            return
+
+        # 仕分け
+        linker_linked_members = []
+        linker_linked_jp_members = []
+        linker_linked_non_jp_members = []
+
+        for data in resp.values():
+            # discord.idを取得
+            _d_id = int(data["discord"]["id"])
+
+            # wikidotアカウントが存在しない場合
+            if len(data["wikidot"]) == 0:
+                continue
+
+            # JPメンバ判定
+            is_jp_member = False
+            for w in data["wikidot"]:
+                if w["is_jp_member"]:
+                    is_jp_member = True
+                    break
+
+            # idを配列に投入
+            linker_linked_members.append(_d_id)
+            if is_jp_member:
+                linker_linked_jp_members.append(_d_id)
+            else:
+                linker_linked_non_jp_members.append(_d_id)
+
+        # linker_linked_membersに含まれないメンバーをunknownに追加
+        linker_unknown_members = [member_id for member_id in member_ids if member_id not in linker_linked_members]
+
+        member_dict = {member.id: member for member in members}
+
+        # ロールの付与
+        for role in registered_roles:
+            role_obj = guild.get_role(role.role_id)
+
+            self.logger.info(f"Role: {role.role_id} in {guild.name}")
+
+            if role_obj is None:
+                await bot_config.NOTIFY_TO_OWNER(self.bot, f"Role not found: {role.role_id} in {guild.name}")
+                continue
+
+            target_user_ids = []
+            # is_linkedがNone / is_jp_memberがNone = 全員
+            if role.is_linked is None and role.is_jp_member is None:
+                target_user_ids = member_ids
+
+            # is_linkedがTrue / is_jp_memberがTrue = 連携済みJPメンバー
+            elif role.is_linked and role.is_jp_member:
+                target_user_ids = linker_linked_jp_members
+
+            # is_linkedがTrue / is_jp_memberがFalse = 連携済み非JPメンバー
+            elif role.is_linked and not role.is_jp_member:
+                target_user_ids = linker_linked_non_jp_members
+
+            # is_linkedがTrue / is_jp_memberがNone = 連携済み
+            elif role.is_linked and role.is_jp_member is None:
+                target_user_ids = linker_linked_members
+
+            # is_linkedがFalse = 未連携
+            elif not role.is_linked:
+                target_user_ids = linker_unknown_members
+
+            for member_id in target_user_ids:
+                member = member_dict.get(member_id)
+                if member is None:
+                    continue
+
+                if role_obj not in member.roles:
+                    await member.add_roles(role_obj)
+
+            # 付与対象から外れたメンバーについてはロールを削除
+            for member in role_obj.members:
+                if member.id not in target_user_ids:
+                    await member.remove_roles(role_obj)
+
+    @tasks.loop(minutes=30)
+    async def update_roles(self):
+        for guild in self.bot.guilds:
+            self.logger.info(f"Updating roles in {guild.name}")
+            await self.update_roles_in_guild(guild)
+
+    @update_roles.before_loop
+    async def before_update_roles(self):
+        await self.bot.wait_until_ready()
+
+    @slash_command(name="force_update", description="ロールの強制更新を行います")
+    @commands.has_permissions(administrator=True)
+    async def force_update(self, ctx: discord.commands.context.ApplicationContext):
+        await ctx.interaction.response.defer(ephemeral=True)
+        await self.update_roles_in_guild(ctx.guild)
+        await ctx.interaction.followup.send("ロールの強制更新を行いました。")
 
 
 def setup(bot):
