@@ -306,11 +306,6 @@ class Linker(commands.Cog):
         # linker_linked_membersに含まれないメンバーをunknownに追加
         linker_unknown_members = [member_id for member_id in member_ids if member_id not in linker_linked_members]
 
-        self.logger.info(f"Linked Members: {linker_linked_members}")
-        self.logger.info(f"Linked JP Members: {linker_linked_jp_members}")
-        self.logger.info(f"Linked Non-JP Members: {linker_linked_non_jp_members}")
-        self.logger.info(f"Unknown Members: {linker_unknown_members}")
-
         member_dict = {member.id: member for member in members}
 
         # ロールの付与
@@ -344,10 +339,8 @@ class Linker(commands.Cog):
             elif role.is_linked is False:
                 target_user_ids = linker_unknown_members
 
-            self.logger.info(f"Target User IDs: {target_user_ids} / {role_obj.name}")
             for member_id in target_user_ids:
                 member = member_dict.get(member_id)
-                self.logger.info(f"Member: {member.display_name} in {guild.name} ({role_obj.name})")
                 if member is None:
                     continue
 
@@ -393,6 +386,35 @@ class Linker(commands.Cog):
 
         data = resp[str(user.id)]
         wikidot = data["wikidot"]
+
+        if len(wikidot) == 0:
+            await ctx.interaction.followup.send("情報が登録されていません。")
+            return
+
+        wikidot_str = "\n".join(
+            [f"**{w['username']}** ({w['unixname']} / {w['id']} / {'JPメンバ' if w['is_jp_member'] else '非JPメンバ'})"
+             for w in wikidot])
+
+        await ctx.interaction.followup.send(
+            f"### **{user.name}** の情報:\n>>> {wikidot_str}"
+        )
+
+    @slash_command(name="recheck_user", description="Linker APIのアカウント情報を更新します")
+    @commands.has_permissions(administrator=True)
+    async def recheck_user(
+            self, ctx: discord.commands.context.ApplicationContext,
+            user: discord.Option(discord.User, "ユーザ", required=True)
+    ):
+        await ctx.interaction.response.defer(ephemeral=True)
+
+        linker_util = LinkerUtility()
+        resp = await linker_util.recheck_flow(user)
+
+        if resp is None:
+            await ctx.interaction.followup.send("エラーが発生しました。")
+            return
+
+        wikidot = resp["wikidot"]
 
         if len(wikidot) == 0:
             await ctx.interaction.followup.send("情報が登録されていません。")
