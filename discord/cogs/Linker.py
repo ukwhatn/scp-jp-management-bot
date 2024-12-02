@@ -152,6 +152,38 @@ class StartFlowView(discord.ui.View):
             f"### **あなたが現在連携しているWikidotアカウント:\n>>> {wikidot_str}"
         )
 
+    @discord.ui.button(
+        label="アカウント情報を更新",
+        style=discord.ButtonStyle.secondary,
+        custom_id="linker:recheck_info"
+    )
+    async def recheck_info(self, button: discord.ui.Button, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+
+        linker_util = LinkerUtility()
+        resp = await linker_util.recheck_flow(interaction.user)
+
+        if resp is None:
+            await interaction.followup.send("エラーが発生しました。")
+            return
+
+        wikidot = resp["wikidot"]
+
+        if len(wikidot) == 0:
+            await interaction.followup.send("情報が登録されていません。")
+            return
+
+        wikidot_str = "\n".join(
+            [
+                f"**[{w['username']}](https://wikidot.com/user:info/{w['unixname']})**"
+                f"（{'JPメンバ' if w['is_jp_member'] else '非JPメンバ'}）"
+                for w in wikidot
+            ])
+
+        await interaction.followup.send(
+            f"### **更新された情報を表示します:\n>>> {wikidot_str}"
+        )
+
 
 class Linker(commands.Cog):
     def __init__(self, bot):
