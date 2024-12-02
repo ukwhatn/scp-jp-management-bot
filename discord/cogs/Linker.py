@@ -306,6 +306,11 @@ class Linker(commands.Cog):
         # linker_linked_membersに含まれないメンバーをunknownに追加
         linker_unknown_members = [member_id for member_id in member_ids if member_id not in linker_linked_members]
 
+        self.logger.info(f"Linked Members: {linker_linked_members}")
+        self.logger.info(f"Linked JP Members: {linker_linked_jp_members}")
+        self.logger.info(f"Linked Non-JP Members: {linker_linked_non_jp_members}")
+        self.logger.info(f"Unknown Members: {linker_unknown_members}")
+
         member_dict = {member.id: member for member in members}
 
         # ロールの付与
@@ -324,23 +329,25 @@ class Linker(commands.Cog):
                 target_user_ids = member_ids
 
             # is_linkedがTrue / is_jp_memberがTrue = 連携済みJPメンバー
-            elif role.is_linked and role.is_jp_member:
+            elif role.is_linked is True and role.is_jp_member is True:
                 target_user_ids = linker_linked_jp_members
 
             # is_linkedがTrue / is_jp_memberがFalse = 連携済み非JPメンバー
-            elif role.is_linked and not role.is_jp_member:
+            elif role.is_linked is True and role.is_jp_member is False:
                 target_user_ids = linker_linked_non_jp_members
 
             # is_linkedがTrue / is_jp_memberがNone = 連携済み
-            elif role.is_linked and role.is_jp_member is None:
+            elif role.is_linked is True and role.is_jp_member is None:
                 target_user_ids = linker_linked_members
 
             # is_linkedがFalse = 未連携
-            elif not role.is_linked:
+            elif role.is_linked is False:
                 target_user_ids = linker_unknown_members
 
+            self.logger.info(f"Target User IDs: {target_user_ids} / {role_obj.name}")
             for member_id in target_user_ids:
                 member = member_dict.get(member_id)
+                self.logger.info(f"Member: {member.display_name} in {guild.name} ({role_obj.name})")
                 if member is None:
                     continue
 
