@@ -20,7 +20,7 @@ class HealthCheckServer:
             return web.Response(status=500, text="NOT OK")
 
     async def start(self):
-        runner = web.AppRunner(self.app)
+        runner = web.AppRunner(self.app, access_log=None)
         await runner.setup()
         site = web.TCPSite(runner, 'localhost', self.port)
         await site.start()
