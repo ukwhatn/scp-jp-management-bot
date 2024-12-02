@@ -1,0 +1,86 @@
+services:
+  discord:
+    build:
+      context: .
+      dockerfile: discord/Dockerfile
+    volumes:
+      - ./discord:/app
+      - ./db:/app/db
+    env_file:
+      - ./envs/discord.env
+      - ./envs/db.env
+      - ./envs/sentry.env
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    depends_on:
+      db:
+        condition: service_healthy
+      db-migrator:
+        condition: service_completed_successfully
+    networks:
+      - db
+
+  db:
+    image: postgres:17
+    env_file:
+      - ./envs/db.env
+    environment:
+      POSTGRES_DB: main
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: pg_isready -U user -d main
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    networks:
+      - db
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    volumes:
+      - ./pgadmin/config/servers.json:/pgadmin4/servers.json
+    environment:
+      PGADMIN_DEFAULT_EMAIL: user@example.com
+      PGADMIN_DEFAULT_PASSWORD: password
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "127.0.0.1:8080:80"
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      db-migrator:
+        condition: service_completed_successfully
+    networks:
+      - db
+
+  db-migrator:
+    build:
+      context: .
+      dockerfile: ./db/Dockerfile
+    tty: true
+    volumes:
+      - ./db:/app
+    env_file:
+      - ./envs/db.env
+    restart: no
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - db
+
+volumes:
+  pg_data:
+
+networks:
+  db:
+    driver: bridge
