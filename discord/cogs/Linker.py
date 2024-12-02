@@ -417,7 +417,7 @@ class Linker(commands.Cog):
                 if member.id not in target_user_ids:
                     await member.remove_roles(role_obj)
 
-    @tasks.loop(minutes=30)
+    @tasks.loop(minutes=15)
     async def update_roles(self):
         for guild in self.bot.guilds:
             self.logger.info(f"Updating roles in {guild.name}")
