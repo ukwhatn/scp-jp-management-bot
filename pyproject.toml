@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "pycord-template"
+name = "linker-bot"
 version = "1.0.0"
 description = "A template for creating a new application"
 authors = ["Yuki Watanabe <ukwhatn@gmail.com>"]
