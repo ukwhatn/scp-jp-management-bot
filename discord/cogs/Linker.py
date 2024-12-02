@@ -115,7 +115,7 @@ class StartFlowView(discord.ui.View):
             )
         except Exception as e:
             await interaction.followup.send(
-                f"<@{bot_config.OWNER_ID}> エラーが発生しました: {e}"
+                f"<@{bot_config.OWNER_ID}> エラーが発生しました: {e}", ephemeral=True
             )
             raise e
 
@@ -125,20 +125,20 @@ class StartFlowView(discord.ui.View):
         custom_id="linker:check_info"
     )
     async def check_info(self, button: discord.ui.Button, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
 
         linker_util = LinkerUtility()
         resp = await linker_util.list_accounts([interaction.user])
 
         if resp is None or str(interaction.user.id) not in resp:
-            await interaction.followup.send("情報が登録されていません。")
+            await interaction.followup.send("情報が登録されていません。", ephemeral=True)
             return
 
         data = resp[str(interaction.user.id)]
         wikidot = data["wikidot"]
 
         if len(wikidot) == 0:
-            await interaction.followup.send("情報が登録されていません。")
+            await interaction.followup.send("情報が登録されていません。", ephemeral=True)
             return
 
         wikidot_str = "\n".join(
@@ -149,7 +149,7 @@ class StartFlowView(discord.ui.View):
             ])
 
         await interaction.followup.send(
-            f"### **あなたが現在連携しているWikidotアカウント:\n>>> {wikidot_str}"
+            f"### あなたが現在連携しているWikidotアカウント:\n>>> {wikidot_str}", ephemeral=True
         )
 
     @discord.ui.button(
@@ -164,13 +164,13 @@ class StartFlowView(discord.ui.View):
         resp = await linker_util.recheck_flow(interaction.user)
 
         if resp is None:
-            await interaction.followup.send("エラーが発生しました。")
+            await interaction.followup.send("エラーが発生しました。", ephemeral=True)
             return
 
         wikidot = resp["wikidot"]
 
         if len(wikidot) == 0:
-            await interaction.followup.send("情報が登録されていません。")
+            await interaction.followup.send("情報が登録されていません。", ephemeral=True)
             return
 
         wikidot_str = "\n".join(
@@ -181,7 +181,7 @@ class StartFlowView(discord.ui.View):
             ])
 
         await interaction.followup.send(
-            f"### **更新された情報を表示します:\n>>> {wikidot_str}"
+            f"### 更新された情報を表示します:\n>>> {wikidot_str}", ephemeral=True
         )
 
 
