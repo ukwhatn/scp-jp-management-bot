@@ -1,6 +1,7 @@
 from datetime import datetime
+from typing import Optional as Opt
 
-from sqlalchemy import Integer, DateTime, ForeignKey, BigInteger
+from sqlalchemy import Integer, DateTime, ForeignKey, BigInteger, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import text
 
@@ -51,8 +52,20 @@ class RegisteredRoles(Base):
     )
 
     guild_id: Mapped[int] = mapped_column(
-        ForeignKey("guilds.guild_id"),
+        ForeignKey("guilds.id"),
         nullable=False
+    )
+
+    # Noneなら両方、Trueならリンク済み、Falseなら未リンク
+    is_linked: Mapped[Opt[bool]] = mapped_column(
+        Boolean,
+        nullable=True
+    )
+
+    # Noneなら両方、TrueならJPメンバー、Falseなら非JPメンバー
+    is_jp_member: Mapped[Opt[bool]] = mapped_column(
+        Boolean,
+        nullable=True
     )
 
     created_at: Mapped[datetime] = mapped_column(
@@ -70,5 +83,3 @@ class RegisteredRoles(Base):
     guild: Mapped["Guilds"] = relationship(
         back_populates="registered_roles"
     )
-
-
