@@ -178,6 +178,62 @@ class Linker(commands.Cog):
                 session.commit()
                 await ctx.interaction.followup.send(f"{role.name} を更新しました。")
 
+    @slash_command(name="list_registered_roles", description="登録済みのロールを表示します")
+    @commands.has_permissions(administrator=True)
+    async def list_registered_roles(self, ctx: discord.commands.context.ApplicationContext):
+        await ctx.interaction.response.defer(ephemeral=True)
+
+        with get_db() as session:
+            guild = session.execute(select(Guilds).where(Guilds.guild_id == ctx.guild.id))
+            guild = guild.scalar()
+
+            if guild is None:
+                await ctx.interaction.followup.send("登録されているロールはありません。")
+                return
+
+            registered_roles = session.execute(select(RegisteredRoles).where(RegisteredRoles.guild_id == guild.id))
+            registered_roles = registered_roles.scalars().all()
+
+            if len(registered_roles) == 0:
+                await ctx.interaction.followup.send("登録されているロールはありません。")
+                return
+
+            roles = []
+            for role in registered_roles:
+                roles.append(f"<&{role.role_id}>: {role.is_linked} {role.is_jp_member}")
+
+            await ctx.interaction.followup.send("\n".join(roles))
+
+    @slash_command(name="delete_registered_role", description="登録済みのロールを削除します")
+    @commands.has_permissions(administrator=True)
+    async def delete_registered_role(
+            self, ctx: discord.commands.context.ApplicationContext,
+            role: discord.Option(discord.Role, "削除対象ロール", required=True)
+    ):
+        await ctx.interaction.response.defer(ephemeral=True)
+
+        with get_db() as session:
+            guild = session.execute(select(Guilds).where(Guilds.guild_id == ctx.guild.id))
+            guild = guild.scalar()
+
+            if guild is None:
+                await ctx.interaction.followup.send("登録されているロールはありません。")
+                return
+
+            registered_role = session.execute(select(RegisteredRoles).where(
+                RegisteredRoles.guild_id == guild.id,
+                RegisteredRoles.role_id == role.id
+            ))
+            registered_role = registered_role.scalar()
+
+            if registered_role is None:
+                await ctx.interaction.followup.send("登録されているロールはありません。")
+                return
+
+            session.delete(registered_role)
+            session.commit()
+            await ctx.interaction.followup.send(f"{role.name} を削除しました。")
+
 
 def setup(bot):
     return bot.add_cog(Linker(bot))
