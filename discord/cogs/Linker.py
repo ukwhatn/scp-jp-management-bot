@@ -369,6 +369,36 @@ class Linker(commands.Cog):
         await self.update_roles_in_guild(ctx.guild)
         await ctx.interaction.followup.send("ロールの強制更新を行いました。")
 
+    @slash_command(name="check_info_from_discord", description="DiscordユーザからLinkerの情報を取得します")
+    @commands.has_permissions(administrator=True)
+    async def check_info_from_discord(
+            self, ctx: discord.commands.context.ApplicationContext,
+            user: discord.Option(discord.User, "ユーザ", required=True)
+    ):
+        await ctx.interaction.response.defer(ephemeral=True)
+
+        linker_util = LinkerUtility()
+        resp = await linker_util.list_accounts([user])
+
+        if resp is None or str(user.id) not in resp:
+            await ctx.interaction.followup.send("情報が登録されていません。")
+            return
+
+        data = resp[str(user.id)]
+        wikidot = data["wikidot"]
+
+        if len(wikidot) == 0:
+            await ctx.interaction.followup.send("情報が登録されていません。")
+            return
+
+        wikidot_str = "\n".join(
+            [f"**{w['username']}** ({w['unixname']} / {w['id']} / {'JPメンバ' if w['is_jp_member'] else '非JPメンバ'})"
+             for w in wikidot])
+
+        await ctx.interaction.followup.send(
+            f"### **{user.name}** の情報:\n>>> {wikidot_str}"
+        )
+
 
 def setup(bot):
     return bot.add_cog(Linker(bot))
