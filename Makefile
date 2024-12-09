@@ -1,8 +1,10 @@
 ENV ?= "dev"
-POETRY_GROUPS = "discord,db,dev"
+POETRY_GROUPS = "discord,db,dev,dumper"
 
 ifeq ($(ENV), prod)
 	COMPOSE_YML := compose.prod.yml
+else ifeq ($(ENV), stg)
+	COMPOSE_YML := compose.stg.yml
 else
 	COMPOSE_YML := compose.dev.yml
 endif
@@ -74,6 +76,9 @@ db\:revision\:create:
 db\:migrate:
 	docker compose -f $(COMPOSE_YML) build db-migrator
 	docker compose -f $(COMPOSE_YML) run --rm db-migrator /bin/bash -c "alembic upgrade head"
+
+db\:backup:
+	docker compose -f $(COMPOSE_YML) exec db-dumper python dump.py oneshot
 
 envs\:setup:
 	cp envs/discord.env.example envs/discord.env
