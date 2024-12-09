@@ -15,5 +15,3 @@ RUN make poetry:install
 
 # add poetry files for symlinks
 COPY ./pyproject.toml ./poetry.lock /
-
-CMD ["/app/bot.sh"]
