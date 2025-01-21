@@ -5,6 +5,8 @@ ifeq ($(ENV), prod)
 	COMPOSE_YML := compose.prod.yml
 else ifeq ($(ENV), stg)
 	COMPOSE_YML := compose.stg.yml
+else ifeq ($(ENV), test)
+	COMPOSE_YML := compose.test.yml
 else
 	COMPOSE_YML := compose.dev.yml
 endif
@@ -79,6 +81,9 @@ db\:migrate:
 
 db\:backup:
 	docker compose -f $(COMPOSE_YML) exec db-dumper python dump.py oneshot
+
+db\:backup\:test:
+	docker compose -f $(COMPOSE_YML) exec db-dumper python dump.py test --confirm
 
 envs\:setup:
 	cp envs/discord.env.example envs/discord.env
