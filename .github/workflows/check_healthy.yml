@@ -1,14 +1,22 @@
 name: Check services healthy
 
 on:
-  pull_request:
+  pull_request_target:
+    branches:
+      - main
+      - develop
 
 jobs:
   check_healthy:
     runs-on: ubuntu-latest
+    if: |
+      (github.event.pull_request.user.login == 'ukwhatn') ||
+      (github.event.pull_request.user.login == 'dependabot[bot]')
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Setup environment
         run: |
@@ -22,12 +30,12 @@ jobs:
 
       - name: Wait for services to be ready
         run: |
-          max_retries=10
-          retry_interval=10
+          max_retries=5
+          retry_interval=5
           
           for i in $(seq 1 $max_retries)
           do
-            if ! make ps ENV=test | grep -q "health: starting"; then
+            if ! make ps ENV=test | grep -qiE "(starting|restarting|unhealthy)"; then
               echo "All services have finished starting!"
               break
             else
