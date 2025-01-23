@@ -19,16 +19,12 @@ class LinkerUtility:
         self.logger = logging.getLogger("LinkerUtility")
 
     async def api_call(self, path, data):
-        headers = {
-            "Authorization": f"Bearer {self.linker_api_key}"
-        }
+        headers = {"Authorization": f"Bearer {self.linker_api_key}"}
 
         self.logger.info(f"API Call: {self.linker_api_url}/{path}")
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f"{self.linker_api_url}/{path}",
-                json=data,
-                headers=headers
+                f"{self.linker_api_url}/{path}", json=data, headers=headers
             )
 
             if response.status_code != 200:
@@ -41,7 +37,9 @@ class LinkerUtility:
             "discord": {
                 "id": str(user.id),
                 "username": user.name,
-                "avatar": user.display_avatar.url if user.display_avatar else "https://cdn.discordapp.com/embed/avatars/0.png"
+                "avatar": user.display_avatar.url
+                if user.display_avatar
+                else "https://cdn.discordapp.com/embed/avatars/0.png",
             }
         }
 
@@ -57,7 +55,9 @@ class LinkerUtility:
             "discord": {
                 "id": str(user.id),
                 "username": user.name,
-                "avatar": user.display_avatar.url if user.display_avatar else "https://cdn.discordapp.com/embed/avatars/0.png"
+                "avatar": user.display_avatar.url
+                if user.display_avatar
+                else "https://cdn.discordapp.com/embed/avatars/0.png",
             }
         }
 
@@ -69,9 +69,7 @@ class LinkerUtility:
         return resp
 
     async def list_accounts(self, users: list[discord.User | discord.Member]):
-        data = {
-            "discord_ids": [str(user.id) for user in users]
-        }
+        data = {"discord_ids": [str(user.id) for user in users]}
 
         resp = await self.api_call("v1/list", data)
 
@@ -89,26 +87,30 @@ class StartFlowView(discord.ui.View):
     @discord.ui.button(
         label="アカウント連携を開始",
         style=discord.ButtonStyle.primary,
-        custom_id="linker:start_flow"
+        custom_id="linker:start_flow",
     )
-    async def start_flow(self, button: discord.ui.Button, interaction: discord.Interaction):
+    async def start_flow(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ):
         await interaction.response.defer()
         try:
             url = await self.linker_util.start_flow(interaction.user)
             await interaction.followup.send(
-                "\n".join([
-                    f"## 以下の注意を読んでから、アカウント連携を開始してください",
-                    "----",
-                    f"1. **以下のURLは、10分間のみ有効です**",
-                    f"2. URLをクリックすると、専用Wikidotサイトに遷移します。**右上に表示されているログイン中のユーザが連携したいユーザであることを確認してください。**",
-                    f"3. サイトを開いた際に「安全な接続をサポートしていません」と表示された場合は、「サイトへ移動」をクリックしてください。",
-                    f"4. **連携作業の途中でブラウザを変更しないでください。**",
-                    f"  - **これには、Discordのアプリ内ブラウザからSafari等に切り替える動作なども含まれます。**",
-                    "----",
-                    "",
-                    f"> ### **[アカウント連携を開始する]({url})**"
-                ]),
-                ephemeral=True
+                "\n".join(
+                    [
+                        "## 以下の注意を読んでから、アカウント連携を開始してください",
+                        "----",
+                        "1. **以下のURLは、10分間のみ有効です**",
+                        "2. URLをクリックすると、専用Wikidotサイトに遷移します。**右上に表示されているログイン中のユーザが連携したいユーザであることを確認してください。**",
+                        "3. サイトを開いた際に「安全な接続をサポートしていません」と表示された場合は、「サイトへ移動」をクリックしてください。",
+                        "4. **連携作業の途中でブラウザを変更しないでください。**",
+                        "  - **これには、Discordのアプリ内ブラウザからSafari等に切り替える動作なども含まれます。**",
+                        "----",
+                        "",
+                        f"> ### **[アカウント連携を開始する]({url})**",
+                    ]
+                ),
+                ephemeral=True,
             )
         except Exception as e:
             await interaction.followup.send(
@@ -119,23 +121,29 @@ class StartFlowView(discord.ui.View):
     @discord.ui.button(
         label="現在の登録情報を確認",
         style=discord.ButtonStyle.secondary,
-        custom_id="linker:check_info"
+        custom_id="linker:check_info",
     )
-    async def check_info(self, button: discord.ui.Button, interaction: discord.Interaction):
+    async def check_info(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ):
         await interaction.response.defer()
 
         linker_util = LinkerUtility()
         resp = await linker_util.list_accounts([interaction.user])
 
         if resp is None or str(interaction.user.id) not in resp:
-            await interaction.followup.send("情報が登録されていません。", ephemeral=True)
+            await interaction.followup.send(
+                "情報が登録されていません。", ephemeral=True
+            )
             return
 
         data = resp[str(interaction.user.id)]
         wikidot = data["wikidot"]
 
         if len(wikidot) == 0:
-            await interaction.followup.send("情報が登録されていません。", ephemeral=True)
+            await interaction.followup.send(
+                "情報が登録されていません。", ephemeral=True
+            )
             return
 
         wikidot_str = "\n".join(
@@ -143,18 +151,22 @@ class StartFlowView(discord.ui.View):
                 f"**[{w['username']}](https://wikidot.com/user:info/{w['unixname']})**"
                 f"（{'JPメンバ' if w['is_jp_member'] else '非JPメンバ'}）"
                 for w in wikidot
-            ])
+            ]
+        )
 
         await interaction.followup.send(
-            f"### あなたが現在連携しているWikidotアカウント:\n>>> {wikidot_str}", ephemeral=True
+            f"### あなたが現在連携しているWikidotアカウント:\n>>> {wikidot_str}",
+            ephemeral=True,
         )
 
     @discord.ui.button(
         label="アカウント情報を更新",
         style=discord.ButtonStyle.secondary,
-        custom_id="linker:recheck_info"
+        custom_id="linker:recheck_info",
     )
-    async def recheck_info(self, button: discord.ui.Button, interaction: discord.Interaction):
+    async def recheck_info(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ):
         await interaction.response.defer(ephemeral=True)
 
         linker_util = LinkerUtility()
@@ -167,7 +179,9 @@ class StartFlowView(discord.ui.View):
         wikidot = resp["wikidot"]
 
         if len(wikidot) == 0:
-            await interaction.followup.send("情報が登録されていません。", ephemeral=True)
+            await interaction.followup.send(
+                "情報が登録されていません。", ephemeral=True
+            )
             return
 
         wikidot_str = "\n".join(
@@ -175,7 +189,8 @@ class StartFlowView(discord.ui.View):
                 f"**[{w['username']}](https://wikidot.com/user:info/{w['unixname']})**"
                 f"（{'JPメンバ' if w['is_jp_member'] else '非JPメンバ'}）"
                 for w in wikidot
-            ])
+            ]
+        )
 
         await interaction.followup.send(
             f"### 更新された情報を表示します:\n>>> {wikidot_str}", ephemeral=True
@@ -198,21 +213,31 @@ class Linker(commands.Cog):
             self.logger.warning("update_roles task is not running. Starting task.")
             self.update_roles.start()
 
-    @slash_command(name="send_linker_start_button", description="アカウント連携を開始するボタンを送信します")
+    @slash_command(
+        name="send_linker_start_button",
+        description="アカウント連携を開始するボタンを送信します",
+    )
     @commands.has_permissions(administrator=True)
-    async def send_linker_start_button(self, ctx: discord.commands.context.ApplicationContext):
+    async def send_linker_start_button(
+        self, ctx: discord.commands.context.ApplicationContext
+    ):
         await ctx.respond(
             "## Linker アカウント連携\n以下のボタンをクリックして、アカウント連携を開始してください。",
-            view=StartFlowView()
+            view=StartFlowView(),
         )
 
     @slash_command(name="register_role", description="付与対象ロールを登録します")
     @commands.has_permissions(administrator=True)
     async def register_role(
-            self, ctx: discord.commands.context.ApplicationContext,
-            role: discord.Option(discord.Role, "付与対象ロール", required=True),
-            is_linked: discord.Option(bool, "連携済みかどうか", required=False, default=None),
-            is_jp_member: discord.Option(bool, "JPメンバーかどうか", required=False, default=None)
+        self,
+        ctx: discord.commands.context.ApplicationContext,
+        role: discord.Option(discord.Role, "付与対象ロール", required=True),
+        is_linked: discord.Option(
+            bool, "連携済みかどうか", required=False, default=None
+        ),
+        is_jp_member: discord.Option(
+            bool, "JPメンバーかどうか", required=False, default=None
+        ),
     ):
         await ctx.interaction.response.defer(ephemeral=True)
 
@@ -223,12 +248,22 @@ class Linker(commands.Cog):
         # is_linkedがTrue / is_jp_memberがNone = 連携済み
         # is_linkedがFalse = 未連携
 
-        if (is_linked, is_jp_member) not in [(None, None), (True, True), (True, False), (True, None), (False, None)]:
-            await ctx.interaction.followup.send("is_linkedとis_jp_memberの組み合わせが不正です。")
+        if (is_linked, is_jp_member) not in [
+            (None, None),
+            (True, True),
+            (True, False),
+            (True, None),
+            (False, None),
+        ]:
+            await ctx.interaction.followup.send(
+                "is_linkedとis_jp_memberの組み合わせが不正です。"
+            )
             return
 
         with get_db() as session:
-            guild = session.execute(select(Guilds).where(Guilds.guild_id == ctx.guild.id))
+            guild = session.execute(
+                select(Guilds).where(Guilds.guild_id == ctx.guild.id)
+            )
             guild = guild.scalar()
 
             if guild is None:
@@ -237,10 +272,12 @@ class Linker(commands.Cog):
                 session.commit()
 
             # guild.registered_rolesの中から検索
-            registered_role = session.execute(select(RegisteredRoles).where(
-                RegisteredRoles.guild_id == guild.id,
-                RegisteredRoles.role_id == role.id
-            ))
+            registered_role = session.execute(
+                select(RegisteredRoles).where(
+                    RegisteredRoles.guild_id == guild.id,
+                    RegisteredRoles.role_id == role.id,
+                )
+            )
             registered_role = registered_role.scalar()
 
             if registered_role is None:
@@ -248,7 +285,7 @@ class Linker(commands.Cog):
                     role_id=role.id,
                     guild_id=guild.id,
                     is_linked=is_linked,
-                    is_jp_member=is_jp_member
+                    is_jp_member=is_jp_member,
                 )
                 session.add(registered_role)
                 session.commit()
@@ -259,56 +296,81 @@ class Linker(commands.Cog):
                 session.commit()
                 await ctx.interaction.followup.send(f"{role.name} を更新しました。")
 
-    @slash_command(name="list_registered_roles", description="登録済みのロールを表示します")
+    @slash_command(
+        name="list_registered_roles", description="登録済みのロールを表示します"
+    )
     @commands.has_permissions(administrator=True)
-    async def list_registered_roles(self, ctx: discord.commands.context.ApplicationContext):
-        await ctx.interaction.response.defer(ephemeral=True)
-
-        with get_db() as session:
-            guild = session.execute(select(Guilds).where(Guilds.guild_id == ctx.guild.id))
-            guild = guild.scalar()
-
-            if guild is None:
-                await ctx.interaction.followup.send("登録されているロールはありません。")
-                return
-
-            registered_roles = session.execute(select(RegisteredRoles).where(RegisteredRoles.guild_id == guild.id))
-            registered_roles = registered_roles.scalars().all()
-
-            if len(registered_roles) == 0:
-                await ctx.interaction.followup.send("登録されているロールはありません。")
-                return
-
-            roles = []
-            for role in registered_roles:
-                roles.append(f"<@&{role.role_id}>: {role.is_linked} {role.is_jp_member}")
-
-            await ctx.interaction.followup.send("\n".join(roles))
-
-    @slash_command(name="delete_registered_role", description="登録済みのロールを削除します")
-    @commands.has_permissions(administrator=True)
-    async def delete_registered_role(
-            self, ctx: discord.commands.context.ApplicationContext,
-            role: discord.Option(discord.Role, "削除対象ロール", required=True)
+    async def list_registered_roles(
+        self, ctx: discord.commands.context.ApplicationContext
     ):
         await ctx.interaction.response.defer(ephemeral=True)
 
         with get_db() as session:
-            guild = session.execute(select(Guilds).where(Guilds.guild_id == ctx.guild.id))
+            guild = session.execute(
+                select(Guilds).where(Guilds.guild_id == ctx.guild.id)
+            )
             guild = guild.scalar()
 
             if guild is None:
-                await ctx.interaction.followup.send("登録されているロールはありません。")
+                await ctx.interaction.followup.send(
+                    "登録されているロールはありません。"
+                )
                 return
 
-            registered_role = session.execute(select(RegisteredRoles).where(
-                RegisteredRoles.guild_id == guild.id,
-                RegisteredRoles.role_id == role.id
-            ))
+            registered_roles = session.execute(
+                select(RegisteredRoles).where(RegisteredRoles.guild_id == guild.id)
+            )
+            registered_roles = registered_roles.scalars().all()
+
+            if len(registered_roles) == 0:
+                await ctx.interaction.followup.send(
+                    "登録されているロールはありません。"
+                )
+                return
+
+            roles = []
+            for role in registered_roles:
+                roles.append(
+                    f"<@&{role.role_id}>: {role.is_linked} {role.is_jp_member}"
+                )
+
+            await ctx.interaction.followup.send("\n".join(roles))
+
+    @slash_command(
+        name="delete_registered_role", description="登録済みのロールを削除します"
+    )
+    @commands.has_permissions(administrator=True)
+    async def delete_registered_role(
+        self,
+        ctx: discord.commands.context.ApplicationContext,
+        role: discord.Option(discord.Role, "削除対象ロール", required=True),
+    ):
+        await ctx.interaction.response.defer(ephemeral=True)
+
+        with get_db() as session:
+            guild = session.execute(
+                select(Guilds).where(Guilds.guild_id == ctx.guild.id)
+            )
+            guild = guild.scalar()
+
+            if guild is None:
+                await ctx.interaction.followup.send(
+                    "登録されているロールはありません。"
+                )
+                return
+
+            registered_role = session.execute(
+                select(RegisteredRoles).where(
+                    RegisteredRoles.guild_id == guild.id,
+                    RegisteredRoles.role_id == role.id,
+                )
+            )
             registered_role = registered_role.scalar()
 
             if registered_role is None:
-                await ctx.interaction.followup.send("登録されているロールはありません。")
+                await ctx.interaction.followup.send(
+                    "登録されているロールはありません。"
+                )
                 return
 
             session.delete(registered_role)
@@ -318,13 +380,17 @@ class Linker(commands.Cog):
     async def update_roles_in_guild(self, guild: discord.Guild):
         # guildに紐づいたロールを取得
         with get_db() as session:
-            guild_db = session.execute(select(Guilds).where(Guilds.guild_id == guild.id))
+            guild_db = session.execute(
+                select(Guilds).where(Guilds.guild_id == guild.id)
+            )
             guild_db = guild_db.scalar()
 
             if guild_db is None:
                 return
 
-            registered_roles = session.execute(select(RegisteredRoles).where(RegisteredRoles.guild_id == guild_db.id))
+            registered_roles = session.execute(
+                select(RegisteredRoles).where(RegisteredRoles.guild_id == guild_db.id)
+            )
             registered_roles = registered_roles.scalars().all()
 
         # guild内のメンバーのIDを取得
@@ -333,7 +399,9 @@ class Linker(commands.Cog):
 
         # linker APIでリストを取得
         linker_util = LinkerUtility()
-        resp = await linker_util.list_accounts([guild.get_member(member_id) for member_id in member_ids])
+        resp = await linker_util.list_accounts(
+            [guild.get_member(member_id) for member_id in member_ids]
+        )
 
         if resp is None:
             return
@@ -366,7 +434,11 @@ class Linker(commands.Cog):
                 linker_linked_non_jp_members.append(_d_id)
 
         # linker_linked_membersに含まれないメンバーをunknownに追加
-        linker_unknown_members = [member_id for member_id in member_ids if member_id not in linker_linked_members]
+        linker_unknown_members = [
+            member_id
+            for member_id in member_ids
+            if member_id not in linker_linked_members
+        ]
 
         member_dict = {member.id: member for member in members}
 
@@ -377,7 +449,9 @@ class Linker(commands.Cog):
             self.logger.info(f"Role: {role.role_id} in {guild.name}")
 
             if role_obj is None:
-                await bot_config.NOTIFY_TO_OWNER(self.bot, f"Role not found: {role.role_id} in {guild.name}")
+                await bot_config.NOTIFY_TO_OWNER(
+                    self.bot, f"Role not found: {role.role_id} in {guild.name}"
+                )
                 continue
 
             target_user_ids = []
@@ -431,11 +505,15 @@ class Linker(commands.Cog):
         await self.update_roles_in_guild(ctx.guild)
         await ctx.interaction.followup.send("ロールの強制更新を行いました。")
 
-    @slash_command(name="check_info_from_discord", description="DiscordユーザからLinkerの情報を取得します")
+    @slash_command(
+        name="check_info_from_discord",
+        description="DiscordユーザからLinkerの情報を取得します",
+    )
     @commands.has_permissions(administrator=True)
     async def check_info_from_discord(
-            self, ctx: discord.commands.context.ApplicationContext,
-            user: discord.Option(discord.User, "ユーザ", required=True)
+        self,
+        ctx: discord.commands.context.ApplicationContext,
+        user: discord.Option(discord.User, "ユーザ", required=True),
     ):
         await ctx.interaction.response.defer(ephemeral=True)
 
@@ -454,18 +532,24 @@ class Linker(commands.Cog):
             return
 
         wikidot_str = "\n".join(
-            [f"**{w['username']}** ({w['unixname']} / {w['id']} / {'JPメンバ' if w['is_jp_member'] else '非JPメンバ'})"
-             for w in wikidot])
+            [
+                f"**{w['username']}** ({w['unixname']} / {w['id']} / {'JPメンバ' if w['is_jp_member'] else '非JPメンバ'})"
+                for w in wikidot
+            ]
+        )
 
         await ctx.interaction.followup.send(
             f"### **{user.name}** の情報:\n>>> {wikidot_str}"
         )
 
-    @slash_command(name="recheck_user", description="Linker APIのアカウント情報を更新します")
+    @slash_command(
+        name="recheck_user", description="Linker APIのアカウント情報を更新します"
+    )
     @commands.has_permissions(administrator=True)
     async def recheck_user(
-            self, ctx: discord.commands.context.ApplicationContext,
-            user: discord.Option(discord.User, "ユーザ", required=True)
+        self,
+        ctx: discord.commands.context.ApplicationContext,
+        user: discord.Option(discord.User, "ユーザ", required=True),
     ):
         await ctx.interaction.response.defer(ephemeral=True)
 
@@ -483,8 +567,11 @@ class Linker(commands.Cog):
             return
 
         wikidot_str = "\n".join(
-            [f"**{w['username']}** ({w['unixname']} / {w['id']} / {'JPメンバ' if w['is_jp_member'] else '非JPメンバ'})"
-             for w in wikidot])
+            [
+                f"**{w['username']}** ({w['unixname']} / {w['id']} / {'JPメンバ' if w['is_jp_member'] else '非JPメンバ'})"
+                for w in wikidot
+            ]
+        )
 
         await ctx.interaction.followup.send(
             f"### **{user.name}** の情報:\n>>> {wikidot_str}"

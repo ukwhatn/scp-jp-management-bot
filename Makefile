@@ -64,12 +64,24 @@ poetry\:lock:
 poetry\:update:
 	poetry update --with $(group)
 
+poetry\:update\:all:
+	poetry update
+
 poetry\:reset:
 	poetry env remove $(which python)
 	poetry install
 
 dev\:setup:
 	poetry install --with $(POETRY_GROUPS)
+
+lint:
+	poetry run ruff check .
+
+lint\:fix:
+	poetry run ruff check --fix .
+
+format:
+	poetry run ruff format .
 
 db\:revision\:create:
 	docker compose -f $(COMPOSE_YML) build db-migrator
@@ -84,6 +96,10 @@ db\:backup:
 
 db\:backup\:test:
 	docker compose -f $(COMPOSE_YML) exec db-dumper python dump.py test --confirm
+
+db\:restore:
+	docker compose -f compose.prod.yml up -d --build db-dumper
+	docker compose -f compose.prod.yml exec db-dumper python dump.py restore
 
 envs\:setup:
 	cp envs/discord.env.example envs/discord.env

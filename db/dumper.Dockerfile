@@ -7,7 +7,7 @@ WORKDIR /app
 
 RUN apt update && \
     apt upgrade -y && \
-    apt install -y libpq-dev gcc make postgresql-common && \
+    apt install -y libpq-dev build-essential make postgresql-common && \
     /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -i -v 17 && \
     apt install -y postgresql-client-17 && \
     apt clean

@@ -11,25 +11,16 @@ from .connection import Base
 class Guilds(Base):
     __tablename__ = "guilds"
 
-    id: Mapped[int] = mapped_column(
-        Integer,
-        primary_key=True
-    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
-    guild_id: Mapped[int] = mapped_column(
-        BigInteger,
-        unique=True
-    )
+    guild_id: Mapped[int] = mapped_column(BigInteger, unique=True)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=text("now()")
+        DateTime(timezone=True), server_default=text("now()")
     )
 
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=text("now()"),
-        onupdate=text("now()")
+        DateTime(timezone=True), server_default=text("now()"), onupdate=text("now()")
     )
 
     # Relationships
@@ -41,45 +32,25 @@ class Guilds(Base):
 class RegisteredRoles(Base):
     __tablename__ = "registered_roles"
 
-    id: Mapped[int] = mapped_column(
-        Integer,
-        primary_key=True
-    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
-    role_id: Mapped[int] = mapped_column(
-        BigInteger,
-        unique=True
-    )
+    role_id: Mapped[int] = mapped_column(BigInteger, unique=True)
 
-    guild_id: Mapped[int] = mapped_column(
-        ForeignKey("guilds.id"),
-        nullable=False
-    )
+    guild_id: Mapped[int] = mapped_column(ForeignKey("guilds.id"), nullable=False)
 
     # Noneなら両方、Trueならリンク済み、Falseなら未リンク
-    is_linked: Mapped[Opt[bool]] = mapped_column(
-        Boolean,
-        nullable=True
-    )
+    is_linked: Mapped[Opt[bool]] = mapped_column(Boolean, nullable=True)
 
     # Noneなら両方、TrueならJPメンバー、Falseなら非JPメンバー
-    is_jp_member: Mapped[Opt[bool]] = mapped_column(
-        Boolean,
-        nullable=True
-    )
+    is_jp_member: Mapped[Opt[bool]] = mapped_column(Boolean, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=text("now()")
+        DateTime(timezone=True), server_default=text("now()")
     )
 
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=text("now()"),
-        onupdate=text("now()")
+        DateTime(timezone=True), server_default=text("now()"), onupdate=text("now()")
     )
 
     # Relationships
-    guild: Mapped["Guilds"] = relationship(
-        back_populates="registered_roles"
-    )
+    guild: Mapped["Guilds"] = relationship(back_populates="registered_roles")
