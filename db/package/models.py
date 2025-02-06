@@ -54,3 +54,19 @@ class RegisteredRoles(Base):
 
     # Relationships
     guild: Mapped["Guilds"] = relationship(back_populates="registered_roles")
+
+
+class NickUpdateTargetGuilds(Base):
+    __tablename__ = "nick_update_target_guilds"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    guild_id: Mapped[int] = mapped_column(BigInteger, unique=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()"), onupdate=text("now()")
+    )
