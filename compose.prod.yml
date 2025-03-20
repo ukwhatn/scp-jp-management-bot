@@ -20,13 +20,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      redis:
-        condition: service_healthy
+#      redis:
+#        condition: service_healthy
       db-migrator:
         condition: service_completed_successfully
     networks:
       - db
-      - redis
+#      - redis
 
   db:
     container_name: scp-jp-management-bot-db
@@ -47,19 +47,19 @@ services:
     networks:
       - db
 
-  redis:
-    container_name: scp-jp-management-bot-redis
-    image: redis:7.4.1
-    volumes:
-      - redis_data:/data
-    restart: unless-stopped
-    healthcheck:
-      test: redis-cli ping
-      interval: 2s
-      timeout: 5s
-      retries: 30
-    networks:
-      - redis
+#  redis:
+#    container_name: scp-jp-management-bot-redis
+#    image: redis:7.4.1
+#    volumes:
+#      - redis_data:/data
+#    restart: unless-stopped
+#    healthcheck:
+#      test: redis-cli ping
+#      interval: 2s
+#      timeout: 5s
+#      retries: 30
+#    networks:
+#      - redis
 
   db-migrator:
     container_name: scp-jp-management-bot-db-migrator
@@ -95,10 +95,10 @@ services:
 
 volumes:
   pg_data:
-  redis_data:
+#  redis_data:
 
 networks:
   db:
     driver: bridge
-  redis:
-    driver: bridge
+#  redis:
+#    driver: bridge
