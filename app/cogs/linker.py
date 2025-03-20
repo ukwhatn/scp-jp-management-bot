@@ -501,7 +501,7 @@ class Linker(commands.Cog):
 
     @tasks.loop(minutes=15)
     async def update_roles(self):
-        for guild in self.bot.Guild:
+        for guild in self.bot.guilds:
             self.logger.info(f"Updating roles in {guild.name}")
             await self.update_roles_in_guild(guild, update_nick=True)
 
