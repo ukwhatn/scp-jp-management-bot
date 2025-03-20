@@ -110,7 +110,7 @@ jobs:
             exit 1
           fi
           
-          if make ps ENV=test | grep -qw "unhealthy"; then
+          if make ps ENV=test | grep -q "unhealthy"; then
             echo "❌ 不健全なサービスがあります:"
             make ps ENV=test
             make logs:once ENV=test
