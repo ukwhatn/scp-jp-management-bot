@@ -56,6 +56,10 @@ class Settings(BaseSettings):
     LINKER_API_URL: Optional[str] = None
     LINKER_API_KEY: Optional[str] = None
 
+    # Member Management
+    MEMBER_MANAGEMENT_API_URL: Optional[str] = None
+    MEMBER_MANAGEMENT_API_KEY: Optional[str] = None
+
     @classmethod
     @field_validator("SENTRY_DSN")
     def sentry_dsn_can_be_blank(cls, v: Optional[str]) -> Optional[str]:
