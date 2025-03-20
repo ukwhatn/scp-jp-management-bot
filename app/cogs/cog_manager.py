@@ -1,4 +1,5 @@
 import glob
+import traceback
 
 import discord
 from discord.commands import Option, slash_command
@@ -40,7 +41,9 @@ class CogManager(commands.Cog):
             self.bot.reload_extension(f"cogs.{modulename}")
             await ctx.respond(f":arrows_counterclockwise: Reloaded {modulename}")
         except Exception:
-            await ctx.respond(f":exclamation: Failed to reload {modulename}")
+            await ctx.respond(
+                f":exclamation: Failed to (un/re)load {modulename}\n{traceback.format_exc()}"
+            )
 
     @slash_command(name="load", description="指定したCogをロードします")
     @commands.is_owner()
@@ -56,7 +59,9 @@ class CogManager(commands.Cog):
             self.bot.load_extension(f"cogs.{modulename}")
             await msg.edit_original_response(content=":thumbsup: Loaded")
         except Exception:
-            await msg.edit_original_response(content=":exclamation: Failed")
+            await ctx.respond(
+                f":exclamation: Failed to (un/re)load {modulename}\n{traceback.format_exc()}"
+            )
 
     @slash_command(name="unload", description="指定したCogをアンロードします")
     @commands.is_owner()
@@ -72,7 +77,9 @@ class CogManager(commands.Cog):
             self.bot.unload_extension(f"cogs.{modulename}")
             await ctx.respond(f":arrow_down: Unloaded {modulename}")
         except Exception:
-            await ctx.respond(f":exclamation: Failed to unload {modulename}")
+            await ctx.respond(
+                f":exclamation: Failed to (un/re)load {modulename}\n{traceback.format_exc()}"
+            )
 
 
 def setup(bot):
