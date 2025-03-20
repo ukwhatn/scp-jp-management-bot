@@ -40,8 +40,10 @@ class CogManager(commands.Cog):
         try:
             self.bot.reload_extension(f"cogs.{modulename}")
             await ctx.respond(f":arrows_counterclockwise: Reloaded {modulename}")
-        except Exception as e:
-            await ctx.respond(f":exclamation: Failed to (un/re)load {modulename}\n{traceback.format_exc()}")
+        except Exception:
+            await ctx.respond(
+                f":exclamation: Failed to (un/re)load {modulename}\n{traceback.format_exc()}"
+            )
 
     @slash_command(name="load", description="指定したCogをロードします")
     @commands.is_owner()
@@ -56,8 +58,10 @@ class CogManager(commands.Cog):
         try:
             self.bot.load_extension(f"cogs.{modulename}")
             await msg.edit_original_response(content=":thumbsup: Loaded")
-        except Exception as e:
-            await ctx.respond(f":exclamation: Failed to (un/re)load {modulename}\n{traceback.format_exc()}")
+        except Exception:
+            await ctx.respond(
+                f":exclamation: Failed to (un/re)load {modulename}\n{traceback.format_exc()}"
+            )
 
     @slash_command(name="unload", description="指定したCogをアンロードします")
     @commands.is_owner()
@@ -72,8 +76,10 @@ class CogManager(commands.Cog):
         try:
             self.bot.unload_extension(f"cogs.{modulename}")
             await ctx.respond(f":arrow_down: Unloaded {modulename}")
-        except Exception as e:
-            await ctx.respond(f":exclamation: Failed to (un/re)load {modulename}\n{traceback.format_exc()}")
+        except Exception:
+            await ctx.respond(
+                f":exclamation: Failed to (un/re)load {modulename}\n{traceback.format_exc()}"
+            )
 
 
 def setup(bot):
