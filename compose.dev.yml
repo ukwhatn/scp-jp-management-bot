@@ -1,37 +1,41 @@
 services:
-  discord:
+  app:
+    container_name: scp-jp-management-bot-app
     build:
       context: .
-      dockerfile: discord/Dockerfile
-    command: [ "/bin/sh", "-c", "NEW_RELIC_CONFIG_FILE=newrelic.ini NEW_RELIC_ENVIRONMENT=development newrelic-admin run-program python bot.py" ]
+      dockerfile: docker/app.Dockerfile
     volumes:
-      - ./discord:/app
-      - ./db:/app/db
+      - ./app:/app
     env_file:
-      - ./envs/discord.env
       - ./envs/db.env
-      - ./envs/sentry.env
+      - ./envs/discord.env
+    environment:
+      - ENV_MODE=development
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8080" ]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 5s
+      test: ["CMD-SHELL", "[ -f /tmp/bot_status.txt ] && grep -q 'ready' /tmp/bot_status.txt && [ $(date +%s) -lt $(($(cut -d':' -f2 /tmp/bot_status.txt) + 60)) ] || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 3
     depends_on:
       db:
         condition: service_healthy
+#      redis:
+#        condition: service_healthy
       db-migrator:
         condition: service_completed_successfully
     networks:
       - db
+#      - redis
 
   db:
+    container_name: scp-jp-management-bot-db
     image: postgres:17
     env_file:
       - ./envs/db.env
     environment:
       POSTGRES_DB: main
+      TZ: Azia/Tokyo
     volumes:
       - pg_data:/var/lib/postgresql/data
     restart: unless-stopped
@@ -43,17 +47,14 @@ services:
     networks:
       - db
 
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    volumes:
-      - ./pgadmin/config/servers.json:/pgadmin4/servers.json
+  adminer:
+    container_name: fastapi-template-adminer
+    image: adminer:latest
     environment:
-      PGADMIN_DEFAULT_EMAIL: user@example.com
-      PGADMIN_DEFAULT_PASSWORD: password
-      PGADMIN_CONFIG_SERVER_MODE: "False"
-      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+      ADMINER_DEFAULT_SERVER: db
+      ADMINER_DESIGN: pepa-linha
     ports:
-      - "127.0.0.1:8080:80"
+      - "127.0.0.1:8001:8080"
     restart: unless-stopped
     depends_on:
       db:
@@ -63,15 +64,30 @@ services:
     networks:
       - db
 
+#  redis:
+#    container_name: scp-jp-management-bot-redis
+#    image: redis:7.4.1
+#    volumes:
+#      - redis_data:/data
+#    restart: unless-stopped
+#    healthcheck:
+#      test: redis-cli ping
+#      interval: 2s
+#      timeout: 5s
+#      retries: 30
+#    networks:
+#      - redis
+
   db-migrator:
-    build:
-      context: .
-      dockerfile: db/migrator.Dockerfile
-    tty: true
+    container_name: scp-jp-management-bot-db-migrator
+    image: ghcr.io/ukwhatn/psql-migrator:latest
     volumes:
-      - ./db:/app
+      - ./versions:/app/versions
+      - ./app/db/models:/app/migrations/models
     env_file:
       - ./envs/db.env
+    environment:
+      - POSTGRES_HOST=db
     restart: no
     depends_on:
       db:
@@ -79,9 +95,29 @@ services:
     networks:
       - db
 
+  # 開発環境では必要に応じてコメントを外して使用
+#  db-dumper:
+#    container_name: scp-jp-management-bot-db-dumper
+#    image: ghcr.io/ukwhatn/psql-dumper:latest
+#    env_file:
+#      - ./envs/db.env
+#      - ./envs/sentry.env
+#      - ./envs/aws-s3.env
+#    environment:
+#      - POSTGRES_HOST=db
+#    restart: unless-stopped
+#    depends_on:
+#      db:
+#        condition: service_healthy
+#    networks:
+#      - db
+
 volumes:
   pg_data:
+#  redis_data:
 
 networks:
   db:
     driver: bridge
+#  redis:
+#    driver: bridge
