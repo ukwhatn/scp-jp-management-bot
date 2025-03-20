@@ -32,7 +32,7 @@ class LinkerUtility:
         if resp is None:
             return None
 
-        return resp["url"]
+        return resp.url
 
     async def recheck_flow(self, user: discord.User | discord.Member):
         resp = await self.linker_client.flow_recheck(
@@ -54,7 +54,7 @@ class LinkerUtility:
         if resp is None:
             return None
 
-        return resp["result"]
+        return resp.result
 
 
 class StartFlowView(discord.ui.View):
@@ -73,23 +73,28 @@ class StartFlowView(discord.ui.View):
         await interaction.response.defer()
         try:
             url = await self.linker_util.start_flow(interaction.user)
-            await interaction.followup.send(
-                "\n".join(
-                    [
-                        "## 以下の注意を読んでから、アカウント連携を開始してください",
-                        "----",
-                        "1. **以下のURLは、10分間のみ有効です**",
-                        "2. URLをクリックすると、専用Wikidotサイトに遷移します。**右上に表示されているログイン中のユーザが連携したいユーザであることを確認してください。**",
-                        "3. サイトを開いた際に「安全な接続をサポートしていません」と表示された場合は、「サイトへ移動」をクリックしてください。",
-                        "4. **連携作業の途中でブラウザを変更しないでください。**",
-                        "  - **これには、Discordのアプリ内ブラウザからSafari等に切り替える動作なども含まれます。**",
-                        "----",
-                        "",
-                        f"> ### **[アカウント連携を開始する]({url})**",
-                    ]
-                ),
-                ephemeral=True,
-            )
+            if url is not None:
+                await interaction.followup.send(
+                    "\n".join(
+                        [
+                            "## 以下の注意を読んでから、アカウント連携を開始してください",
+                            "----",
+                            "1. **以下のURLは、10分間のみ有効です**",
+                            "2. URLをクリックすると、専用Wikidotサイトに遷移します。**右上に表示されているログイン中のユーザが連携したいユーザであることを確認してください。**",
+                            "3. サイトを開いた際に「安全な接続をサポートしていません」と表示された場合は、「サイトへ移動」をクリックしてください。",
+                            "4. **連携作業の途中でブラウザを変更しないでください。**",
+                            "  - **これには、Discordのアプリ内ブラウザからSafari等に切り替える動作なども含まれます。**",
+                            "----",
+                            "",
+                            f"> ### **[アカウント連携を開始する]({url})**",
+                        ]
+                    ),
+                    ephemeral=True,
+                )
+            else:
+                await interaction.followup.send(
+                    "エラーが発生しました、しばらく待ったあと、再度お試しください", ephemeral=True
+                )
         except Exception as e:
             await interaction.followup.send(
                 "エラーが発生しました、再度お試しください", ephemeral=True
@@ -116,7 +121,7 @@ class StartFlowView(discord.ui.View):
             return
 
         data = resp[str(interaction.user.id)]
-        wikidot = data["wikidot"]
+        wikidot = data.wikidot
 
         if len(wikidot) == 0:
             await interaction.followup.send(
@@ -126,8 +131,8 @@ class StartFlowView(discord.ui.View):
 
         wikidot_str = "\n".join(
             [
-                f"**[{w['username']}](https://wikidot.com/user:info/{w['unixname']})**"
-                f"（{'JPメンバ' if w['is_jp_member'] else '非JPメンバ'}）"
+                f"**[{w.username}](https://wikidot.com/user:info/{w.unixname})**"
+                f"（{'JPメンバ' if w.is_jp_member else '非JPメンバ'}）"
                 for w in wikidot
             ]
         )
@@ -154,7 +159,7 @@ class StartFlowView(discord.ui.View):
             await interaction.followup.send("エラーが発生しました。", ephemeral=True)
             return
 
-        wikidot = resp["wikidot"]
+        wikidot = resp.wikidot
 
         if len(wikidot) == 0:
             await interaction.followup.send(
@@ -164,8 +169,8 @@ class StartFlowView(discord.ui.View):
 
         wikidot_str = "\n".join(
             [
-                f"**[{w['username']}](https://wikidot.com/user:info/{w['unixname']})**"
-                f"（{'JPメンバ' if w['is_jp_member'] else '非JPメンバ'}）"
+                f"**[{w.username}](https://wikidot.com/user:info/{w.unixname})**"
+                f"（{'JPメンバ' if w.is_jp_member else '非JPメンバ'}）"
                 for w in wikidot
             ]
         )
@@ -397,16 +402,16 @@ class Linker(commands.Cog):
 
         for data in resp.values():
             # discord.idを取得
-            _d_id = int(data["discord"]["id"])
+            _d_id = int(data.discord.id)
 
             # wikidotアカウントが存在しない場合
-            if len(data["wikidot"]) == 0:
+            if len(data.wikidot) == 0:
                 continue
 
             # JPメンバ判定
             is_jp_member = False
-            for w in data["wikidot"]:
-                if w["is_jp_member"]:
+            for w in data.wikidot:
+                if w.is_jp_member:
                     is_jp_member = True
                     break
 
@@ -421,7 +426,7 @@ class Linker(commands.Cog):
                 # discord idとwikidot user nameのペアを作成
                 # 複数のwikidotアカウントが連携されている場合は、すべてのアカウントを"/"で連結
                 nick_update_target.append(
-                    (_d_id, str("/".join([w["username"] for w in data["wikidot"]])))
+                    (_d_id, str("/".join([w.username for w in data.wikidot])))
                 )
 
         # linker_linked_membersに含まれないメンバーをunknownに追加
@@ -540,7 +545,7 @@ class Linker(commands.Cog):
             return
 
         data = resp[str(user.id)]
-        wikidot = data["wikidot"]
+        wikidot = data.wikidot
 
         if len(wikidot) == 0:
             await ctx.interaction.followup.send("情報が登録されていません。")
@@ -548,7 +553,7 @@ class Linker(commands.Cog):
 
         wikidot_str = "\n".join(
             [
-                f"**{w['username']}** ({w['unixname']} / {w['id']} / {'JPメンバ' if w['is_jp_member'] else '非JPメンバ'})"
+                f"**{w.username}** ({w.unixname} / {w.id} / {'JPメンバ' if w.is_jp_member else '非JPメンバ'})"
                 for w in wikidot
             ]
         )
@@ -575,7 +580,7 @@ class Linker(commands.Cog):
             await ctx.interaction.followup.send("エラーが発生しました。")
             return
 
-        wikidot = resp["wikidot"]
+        wikidot = resp.wikidot
 
         if len(wikidot) == 0:
             await ctx.interaction.followup.send("情報が登録されていません。")
@@ -583,7 +588,7 @@ class Linker(commands.Cog):
 
         wikidot_str = "\n".join(
             [
-                f"**{w['username']}** ({w['unixname']} / {w['id']} / {'JPメンバ' if w['is_jp_member'] else '非JPメンバ'})"
+                f"**{w.username}** ({w.unixname} / {w.id} / {'JPメンバ' if w.is_jp_member else '非JPメンバ'})"
                 for w in wikidot
             ]
         )
