@@ -1,5 +1,5 @@
 from .base import Base, BaseModel, TimeStampMixin
-from .linker import *
+from .linker import Guild, NickUpdateTargetGuild, RegisteredRole
 
 __all__ = [
     # base

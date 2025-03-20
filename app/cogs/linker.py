@@ -7,8 +7,9 @@ from discord.ext import commands, tasks
 from sqlalchemy import select
 
 from core import get_settings
-from db.models import Guild, RegisteredRole, NickUpdateTargetGuild
 from db import db_session
+from db.models import Guild, RegisteredRole, NickUpdateTargetGuild
+from utils import DiscordUtil
 
 
 class LinkerUtility:
@@ -91,7 +92,7 @@ class StartFlowView(discord.ui.View):
         custom_id="linker:start_flow",
     )
     async def start_flow(
-            self, button: discord.ui.Button, interaction: discord.Interaction
+        self, button: discord.ui.Button, interaction: discord.Interaction
     ):
         await interaction.response.defer()
         try:
@@ -115,7 +116,7 @@ class StartFlowView(discord.ui.View):
             )
         except Exception as e:
             await interaction.followup.send(
-                f"<@{bot_config.OWNER_ID}> エラーが発生しました: {e}", ephemeral=True
+                "エラーが発生しました、再度お試しください", ephemeral=True
             )
             raise e
 
@@ -125,7 +126,7 @@ class StartFlowView(discord.ui.View):
         custom_id="linker:check_info",
     )
     async def check_info(
-            self, button: discord.ui.Button, interaction: discord.Interaction
+        self, button: discord.ui.Button, interaction: discord.Interaction
     ):
         await interaction.response.defer()
 
@@ -166,7 +167,7 @@ class StartFlowView(discord.ui.View):
         custom_id="linker:recheck_info",
     )
     async def recheck_info(
-            self, button: discord.ui.Button, interaction: discord.Interaction
+        self, button: discord.ui.Button, interaction: discord.Interaction
     ):
         await interaction.response.defer(ephemeral=True)
 
@@ -220,7 +221,7 @@ class Linker(commands.Cog):
     )
     @commands.has_permissions(administrator=True)
     async def send_linker_start_button(
-            self, ctx: discord.commands.context.ApplicationContext
+        self, ctx: discord.commands.context.ApplicationContext
     ):
         await ctx.respond(
             "## Linker アカウント連携\n以下のボタンをクリックして、アカウント連携を開始してください。",
@@ -230,15 +231,15 @@ class Linker(commands.Cog):
     @slash_command(name="register_role", description="付与対象ロールを登録します")
     @commands.has_permissions(administrator=True)
     async def register_role(
-            self,
-            ctx: discord.commands.context.ApplicationContext,
-            role: discord.Option(discord.Role, "付与対象ロール", required=True),
-            is_linked: discord.Option(
-                bool, "連携済みかどうか", required=False, default=None
-            ),
-            is_jp_member: discord.Option(
-                bool, "JPメンバーかどうか", required=False, default=None
-            ),
+        self,
+        ctx: discord.commands.context.ApplicationContext,
+        role: discord.Option(discord.Role, "付与対象ロール", required=True),
+        is_linked: discord.Option(
+            bool, "連携済みかどうか", required=False, default=None
+        ),
+        is_jp_member: discord.Option(
+            bool, "JPメンバーかどうか", required=False, default=None
+        ),
     ):
         await ctx.interaction.response.defer(ephemeral=True)
 
@@ -262,9 +263,7 @@ class Linker(commands.Cog):
             return
 
         with db_session() as session:
-            guild = session.execute(
-                select(Guild).where(Guild.guild_id == ctx.guild.id)
-            )
+            guild = session.execute(select(Guild).where(Guild.guild_id == ctx.guild.id))
             guild = guild.scalar()
 
             if guild is None:
@@ -302,14 +301,12 @@ class Linker(commands.Cog):
     )
     @commands.has_permissions(administrator=True)
     async def list_registered_roles(
-            self, ctx: discord.commands.context.ApplicationContext
+        self, ctx: discord.commands.context.ApplicationContext
     ):
         await ctx.interaction.response.defer(ephemeral=True)
 
         with db_session() as session:
-            guild = session.execute(
-                select(Guild).where(Guild.guild_id == ctx.guild.id)
-            )
+            guild = session.execute(select(Guild).where(Guild.guild_id == ctx.guild.id))
             guild = guild.scalar()
 
             if guild is None:
@@ -342,16 +339,14 @@ class Linker(commands.Cog):
     )
     @commands.has_permissions(administrator=True)
     async def delete_registered_role(
-            self,
-            ctx: discord.commands.context.ApplicationContext,
-            role: discord.Option(discord.Role, "削除対象ロール", required=True),
+        self,
+        ctx: discord.commands.context.ApplicationContext,
+        role: discord.Option(discord.Role, "削除対象ロール", required=True),
     ):
         await ctx.interaction.response.defer(ephemeral=True)
 
         with db_session() as session:
-            guild = session.execute(
-                select(Guild).where(Guild.guild_id == ctx.guild.id)
-            )
+            guild = session.execute(select(Guild).where(Guild.guild_id == ctx.guild.id))
             guild = guild.scalar()
 
             if guild is None:
@@ -379,13 +374,11 @@ class Linker(commands.Cog):
             await ctx.interaction.followup.send(f"{role.name} を削除しました。")
 
     async def update_roles_in_guild(
-            self, guild: discord.Guild, update_nick: bool = False
+        self, guild: discord.Guild, update_nick: bool = False
     ):
         # guildに紐づいたロールを取得
         with db_session() as session:
-            guild_db = session.execute(
-                select(Guild).where(Guild.guild_id == guild.id)
-            )
+            guild_db = session.execute(select(Guild).where(Guild.guild_id == guild.id))
             guild_db = guild_db.scalar()
 
             if guild_db is None:
@@ -397,13 +390,13 @@ class Linker(commands.Cog):
             registered_roles = registered_roles.scalars().all()
 
             is_nick_update_target = (
-                    update_nick
-                    and session.execute(
-                select(NickUpdateTargetGuild).where(
-                    NickUpdateTargetGuild.guild_id == guild.id
-                )
-            ).scalar()
-                    is not None
+                update_nick
+                and session.execute(
+                    select(NickUpdateTargetGuild).where(
+                        NickUpdateTargetGuild.guild_id == guild.id
+                    )
+                ).scalar()
+                is not None
             )
 
         # guild内のメンバーのIDを取得
@@ -471,7 +464,7 @@ class Linker(commands.Cog):
             self.logger.info(f"Role: {role.role_id} in {guild.name}")
 
             if role_obj is None:
-                await bot_config.NOTIFY_TO_OWNER(
+                await DiscordUtil.notify_to_owner(
                     self.bot, f"Role not found: {role.role_id} in {guild.name}"
                 )
                 continue
@@ -525,7 +518,9 @@ class Linker(commands.Cog):
                     try:
                         await member.edit(nick=nick)
                     except discord.Forbidden:
-                        self.logger.info(f"Failed to update nickname for {member.name} in {guild.name}")
+                        self.logger.info(
+                            f"Failed to update nickname for {member.name} in {guild.name}"
+                        )
                         continue
 
     @tasks.loop(minutes=15)
@@ -541,9 +536,9 @@ class Linker(commands.Cog):
     @slash_command(name="force_update", description="ロールの強制更新を行います")
     @commands.has_permissions(administrator=True)
     async def force_update(
-            self,
-            ctx: discord.commands.context.ApplicationContext,
-            nick: discord.Option(bool, "ニックネーム更新の要否", default=False),
+        self,
+        ctx: discord.commands.context.ApplicationContext,
+        nick: discord.Option(bool, "ニックネーム更新の要否", default=False),
     ):
         await ctx.interaction.response.defer(ephemeral=True)
         await self.update_roles_in_guild(ctx.guild, update_nick=nick)
@@ -555,9 +550,9 @@ class Linker(commands.Cog):
     )
     @commands.has_permissions(administrator=True)
     async def check_info_from_discord(
-            self,
-            ctx: discord.commands.context.ApplicationContext,
-            user: discord.Option(discord.User, "ユーザ", required=True),
+        self,
+        ctx: discord.commands.context.ApplicationContext,
+        user: discord.Option(discord.User, "ユーザ", required=True),
     ):
         await ctx.interaction.response.defer(ephemeral=True)
 
@@ -591,9 +586,9 @@ class Linker(commands.Cog):
     )
     @commands.has_permissions(administrator=True)
     async def recheck_user(
-            self,
-            ctx: discord.commands.context.ApplicationContext,
-            user: discord.Option(discord.User, "ユーザ", required=True),
+        self,
+        ctx: discord.commands.context.ApplicationContext,
+        user: discord.Option(discord.User, "ユーザ", required=True),
     ):
         await ctx.interaction.response.defer(ephemeral=True)
 
@@ -626,8 +621,8 @@ class Linker(commands.Cog):
     )
     @commands.has_permissions(administrator=True)
     async def toggle_auto_nick(
-            self,
-            ctx: discord.commands.context.ApplicationContext,
+        self,
+        ctx: discord.commands.context.ApplicationContext,
     ):
         await ctx.interaction.response.defer(ephemeral=True)
 
