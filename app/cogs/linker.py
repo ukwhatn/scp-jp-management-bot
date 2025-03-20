@@ -5,6 +5,7 @@ from discord.commands import slash_command
 from discord.ext import commands, tasks
 from scp_jp.api.linker import LinkerAPIClient
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from core import get_settings
 from db import db_session
@@ -359,16 +360,13 @@ class Linker(commands.Cog):
     ):
         # guildに紐づいたロールを取得
         with db_session() as session:
-            guild_db = session.execute(select(Guild).where(Guild.guild_id == guild.id))
+            guild_db = session.execute(
+                select(Guild).options(selectinload(Guild.registered_roles)).where(Guild.guild_id == guild.id)
+            )
             guild_db = guild_db.scalar()
 
             if guild_db is None:
                 return
-
-            registered_roles = session.execute(
-                select(RegisteredRole).where(RegisteredRole.guild_id == guild_db.id)
-            )
-            registered_roles = registered_roles.scalars().all()
 
             is_nick_update_target = (
                     update_nick
@@ -380,129 +378,129 @@ class Linker(commands.Cog):
                     is not None
             )
 
-        # guild内のメンバーのIDを取得
-        members = await guild.fetch_members().flatten()
-        member_ids = [member.id for member in members if not member.bot]
+            # guild内のメンバーのIDを取得
+            members = await guild.fetch_members().flatten()
+            member_ids = [member.id for member in members if not member.bot]
 
-        # linker APIでリストを取得
-        linker_util = LinkerUtility()
-        resp = await linker_util.list_accounts(
-            [guild.get_member(member_id) for member_id in member_ids]
-        )
+            # linker APIでリストを取得
+            linker_util = LinkerUtility()
+            resp = await linker_util.list_accounts(
+                [guild.get_member(member_id) for member_id in member_ids]
+            )
 
-        if resp is None:
-            return
+            if resp is None:
+                return
 
-        # 仕分け
-        linker_linked_members = []
-        linker_linked_jp_members = []
-        linker_linked_non_jp_members = []
+            # 仕分け
+            linker_linked_members = []
+            linker_linked_jp_members = []
+            linker_linked_non_jp_members = []
 
-        nick_update_target = []
+            nick_update_target = []
 
-        for data in resp.values():
-            # discord.idを取得
-            _d_id = int(data.discord.id)
+            for data in resp.values():
+                # discord.idを取得
+                _d_id = int(data.discord.id)
 
-            # wikidotアカウントが存在しない場合
-            if len(data.wikidot) == 0:
-                continue
-
-            # JPメンバ判定
-            is_jp_member = False
-            for w in data.wikidot:
-                if w.is_jp_member:
-                    is_jp_member = True
-                    break
-
-            # idを配列に投入
-            linker_linked_members.append(_d_id)
-            if is_jp_member:
-                linker_linked_jp_members.append(_d_id)
-            else:
-                linker_linked_non_jp_members.append(_d_id)
-
-            if is_nick_update_target:
-                # discord idとwikidot user nameのペアを作成
-                # 複数のwikidotアカウントが連携されている場合は、すべてのアカウントを"/"で連結
-                nick_update_target.append(
-                    (_d_id, str("/".join([w.username for w in data.wikidot])))
-                )
-
-        # linker_linked_membersに含まれないメンバーをunknownに追加
-        linker_unknown_members = [
-            member_id
-            for member_id in member_ids
-            if member_id not in linker_linked_members
-        ]
-
-        member_dict = {member.id: member for member in members}
-
-        # ロールの付与
-        for role in registered_roles:
-            role_obj = guild.get_role(role.role_id)
-
-            self.logger.info(f"Role: {role.role_id} in {guild.name}")
-
-            if role_obj is None:
-                await DiscordUtil.notify_to_owner(
-                    self.bot, f"Role not found: {role.role_id} in {guild.name}"
-                )
-                continue
-
-            target_user_ids = []
-            # is_linkedがNone / is_jp_memberがNone = 全員
-            if role.is_linked is None and role.is_jp_member is None:
-                target_user_ids = member_ids
-
-            # is_linkedがTrue / is_jp_memberがTrue = 連携済みJPメンバー
-            elif role.is_linked is True and role.is_jp_member is True:
-                target_user_ids = linker_linked_jp_members
-
-            # is_linkedがTrue / is_jp_memberがFalse = 連携済み非JPメンバー
-            elif role.is_linked is True and role.is_jp_member is False:
-                target_user_ids = linker_linked_non_jp_members
-
-            # is_linkedがTrue / is_jp_memberがNone = 連携済み
-            elif role.is_linked is True and role.is_jp_member is None:
-                target_user_ids = linker_linked_members
-
-            # is_linkedがFalse = 未連携
-            elif role.is_linked is False:
-                target_user_ids = linker_unknown_members
-
-            for member_id in target_user_ids:
-                member = member_dict.get(member_id)
-                if member is None:
+                # wikidotアカウントが存在しない場合
+                if len(data.wikidot) == 0:
                     continue
 
-                if role_obj not in member.roles:
-                    await member.add_roles(role_obj)
+                # JPメンバ判定
+                is_jp_member = False
+                for w in data.wikidot:
+                    if w.is_jp_member:
+                        is_jp_member = True
+                        break
 
-            # 付与対象から外れたメンバーについてはロールを削除
-            for member in role_obj.members:
-                if member.id not in target_user_ids:
-                    await member.remove_roles(role_obj)
+                # idを配列に投入
+                linker_linked_members.append(_d_id)
+                if is_jp_member:
+                    linker_linked_jp_members.append(_d_id)
+                else:
+                    linker_linked_non_jp_members.append(_d_id)
 
-        # ニックネームの更新
-        if is_nick_update_target:
-            for member_id, nick in nick_update_target:
-                member = member_dict.get(member_id)
-                if member is None:
+                if is_nick_update_target:
+                    # discord idとwikidot user nameのペアを作成
+                    # 複数のwikidotアカウントが連携されている場合は、すべてのアカウントを"/"で連結
+                    nick_update_target.append(
+                        (_d_id, str("/".join([w.username for w in data.wikidot])))
+                    )
+
+            # linker_linked_membersに含まれないメンバーをunknownに追加
+            linker_unknown_members = [
+                member_id
+                for member_id in member_ids
+                if member_id not in linker_linked_members
+            ]
+
+            member_dict = {member.id: member for member in members}
+
+            # ロールの付与
+            for role in guild_db.registered_roles:
+                role_obj = guild.get_role(role.role_id)
+
+                self.logger.info(f"Role: {role.role_id} in {guild.name}")
+
+                if role_obj is None:
+                    await DiscordUtil.notify_to_owner(
+                        self.bot, f"Role not found: {role.role_id} in {guild.name}"
+                    )
                     continue
 
-                # nickが30文字以上の場合は27で切って"..."を付ける
-                if len(nick) > 30:
-                    nick = nick[:27] + "..."
+                target_user_ids = []
+                # is_linkedがNone / is_jp_memberがNone = 全員
+                if role.is_linked is None and role.is_jp_member is None:
+                    target_user_ids = member_ids
 
-                if member.nick != nick:
-                    try:
-                        await member.edit(nick=nick)
-                    except discord.Forbidden:
-                        self.logger.info(
-                            f"Failed to update nickname for {member.name} in {guild.name}"
-                        )
+                # is_linkedがTrue / is_jp_memberがTrue = 連携済みJPメンバー
+                elif role.is_linked is True and role.is_jp_member is True:
+                    target_user_ids = linker_linked_jp_members
+
+                # is_linkedがTrue / is_jp_memberがFalse = 連携済み非JPメンバー
+                elif role.is_linked is True and role.is_jp_member is False:
+                    target_user_ids = linker_linked_non_jp_members
+
+                # is_linkedがTrue / is_jp_memberがNone = 連携済み
+                elif role.is_linked is True and role.is_jp_member is None:
+                    target_user_ids = linker_linked_members
+
+                # is_linkedがFalse = 未連携
+                elif role.is_linked is False:
+                    target_user_ids = linker_unknown_members
+
+                for member_id in target_user_ids:
+                    member = member_dict.get(member_id)
+                    if member is None:
                         continue
+
+                    if role_obj not in member.roles:
+                        await member.add_roles(role_obj)
+
+                # 付与対象から外れたメンバーについてはロールを削除
+                for member in role_obj.members:
+                    if member.id not in target_user_ids:
+                        await member.remove_roles(role_obj)
+
+            # ニックネームの更新
+            if is_nick_update_target:
+                for member_id, nick in nick_update_target:
+                    member = member_dict.get(member_id)
+                    if member is None:
+                        continue
+
+                    # nickが30文字以上の場合は27で切って"..."を付ける
+                    if len(nick) > 30:
+                        nick = nick[:27] + "..."
+
+                    if member.nick != nick:
+                        try:
+                            await member.edit(nick=nick)
+                        except discord.Forbidden:
+                            self.logger.info(
+                                f"Failed to update nickname for {member.name} in {guild.name}"
+                            )
+                            continue
 
     @tasks.loop(minutes=15)
     async def update_roles(self):
