@@ -5,7 +5,7 @@ from discord.commands import slash_command
 from discord.ext import commands, tasks
 from scp_jp.api.linker import LinkerAPIClient
 from sqlalchemy import select
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import selectinload
 
 from core import get_settings
 from db import db_session
@@ -361,7 +361,7 @@ class Linker(commands.Cog):
         # guildに紐づいたロールを取得
         with db_session() as session:
             guild_db = session.execute(
-                select(Guild).options(joinedload(Guild.registered_roles)).where(Guild.guild_id == guild.id)
+                select(Guild).options(selectinload(Guild.registered_roles)).where(Guild.guild_id == guild.id)
             )
             guild_db = guild_db.scalar()
 
