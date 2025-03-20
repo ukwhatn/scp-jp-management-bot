@@ -1,9 +1,9 @@
 import logging
 
 import discord
-import httpx
 from discord.commands import slash_command
 from discord.ext import commands, tasks
+from scp_jp.api.linker import LinkerAPIClient
 from sqlalchemy import select
 
 from core import get_settings
@@ -20,32 +20,14 @@ class LinkerUtility:
 
         self.logger = logging.getLogger("LinkerUtility")
 
-    async def api_call(self, path, data):
-        headers = {"Authorization": f"Bearer {self.linker_api_key}"}
-
-        self.logger.info(f"API Call: {self.linker_api_url}/{path}")
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{self.linker_api_url}/{path}", json=data, headers=headers
-            )
-
-            if response.status_code != 200:
-                return None
-
-            return response.json()
+        self.linker_client = LinkerAPIClient(self.linker_api_url, self.linker_api_key)
 
     async def start_flow(self, user: discord.User | discord.Member):
-        data = {
-            "discord": {
-                "id": str(user.id),
-                "username": user.name,
-                "avatar": user.display_avatar.url
-                if user.display_avatar
-                else "https://cdn.discordapp.com/embed/avatars/0.png",
-            }
-        }
-
-        resp = await self.api_call("v1/start", data)
+        resp = await self.linker_client.flow_start(
+            discord_id=str(user.id),
+            discord_username=user.name,
+            discord_avatar=user.display_avatar.url if user.display_avatar else "https://cdn.discordapp.com/embed/avatars/0.png",
+        )
 
         if resp is None:
             return None
@@ -53,17 +35,11 @@ class LinkerUtility:
         return resp["url"]
 
     async def recheck_flow(self, user: discord.User | discord.Member):
-        data = {
-            "discord": {
-                "id": str(user.id),
-                "username": user.name,
-                "avatar": user.display_avatar.url
-                if user.display_avatar
-                else "https://cdn.discordapp.com/embed/avatars/0.png",
-            }
-        }
-
-        resp = await self.api_call("v1/recheck", data)
+        resp = await self.linker_client.flow_recheck(
+            discord_id=str(user.id),
+            discord_username=user.name,
+            discord_avatar=user.display_avatar.url if user.display_avatar else "https://cdn.discordapp.com/embed/avatars/0.png",
+        )
 
         if resp is None:
             return None
@@ -71,9 +47,9 @@ class LinkerUtility:
         return resp
 
     async def list_accounts(self, users: list[discord.User | discord.Member]):
-        data = {"discord_ids": [str(user.id) for user in users]}
-
-        resp = await self.api_call("v1/list", data)
+        resp = await self.linker_client.account_list(
+            discord_ids=[str(user.id) for user in users]
+        )
 
         if resp is None:
             return None
@@ -92,7 +68,7 @@ class StartFlowView(discord.ui.View):
         custom_id="linker:start_flow",
     )
     async def start_flow(
-        self, button: discord.ui.Button, interaction: discord.Interaction
+            self, button: discord.ui.Button, interaction: discord.Interaction
     ):
         await interaction.response.defer()
         try:
@@ -126,7 +102,7 @@ class StartFlowView(discord.ui.View):
         custom_id="linker:check_info",
     )
     async def check_info(
-        self, button: discord.ui.Button, interaction: discord.Interaction
+            self, button: discord.ui.Button, interaction: discord.Interaction
     ):
         await interaction.response.defer()
 
@@ -167,7 +143,7 @@ class StartFlowView(discord.ui.View):
         custom_id="linker:recheck_info",
     )
     async def recheck_info(
-        self, button: discord.ui.Button, interaction: discord.Interaction
+            self, button: discord.ui.Button, interaction: discord.Interaction
     ):
         await interaction.response.defer(ephemeral=True)
 
@@ -221,7 +197,7 @@ class Linker(commands.Cog):
     )
     @commands.has_permissions(administrator=True)
     async def send_linker_start_button(
-        self, ctx: discord.commands.context.ApplicationContext
+            self, ctx: discord.commands.context.ApplicationContext
     ):
         await ctx.respond(
             "## Linker アカウント連携\n以下のボタンをクリックして、アカウント連携を開始してください。",
@@ -231,15 +207,15 @@ class Linker(commands.Cog):
     @slash_command(name="register_role", description="付与対象ロールを登録します")
     @commands.has_permissions(administrator=True)
     async def register_role(
-        self,
-        ctx: discord.commands.context.ApplicationContext,
-        role: discord.Option(discord.Role, "付与対象ロール", required=True),
-        is_linked: discord.Option(
-            bool, "連携済みかどうか", required=False, default=None
-        ),
-        is_jp_member: discord.Option(
-            bool, "JPメンバーかどうか", required=False, default=None
-        ),
+            self,
+            ctx: discord.commands.context.ApplicationContext,
+            role: discord.Option(discord.Role, "付与対象ロール", required=True),
+            is_linked: discord.Option(
+                bool, "連携済みかどうか", required=False, default=None
+            ),
+            is_jp_member: discord.Option(
+                bool, "JPメンバーかどうか", required=False, default=None
+            ),
     ):
         await ctx.interaction.response.defer(ephemeral=True)
 
@@ -301,7 +277,7 @@ class Linker(commands.Cog):
     )
     @commands.has_permissions(administrator=True)
     async def list_registered_roles(
-        self, ctx: discord.commands.context.ApplicationContext
+            self, ctx: discord.commands.context.ApplicationContext
     ):
         await ctx.interaction.response.defer(ephemeral=True)
 
@@ -339,9 +315,9 @@ class Linker(commands.Cog):
     )
     @commands.has_permissions(administrator=True)
     async def delete_registered_role(
-        self,
-        ctx: discord.commands.context.ApplicationContext,
-        role: discord.Option(discord.Role, "削除対象ロール", required=True),
+            self,
+            ctx: discord.commands.context.ApplicationContext,
+            role: discord.Option(discord.Role, "削除対象ロール", required=True),
     ):
         await ctx.interaction.response.defer(ephemeral=True)
 
@@ -374,7 +350,7 @@ class Linker(commands.Cog):
             await ctx.interaction.followup.send(f"{role.name} を削除しました。")
 
     async def update_roles_in_guild(
-        self, guild: discord.Guild, update_nick: bool = False
+            self, guild: discord.Guild, update_nick: bool = False
     ):
         # guildに紐づいたロールを取得
         with db_session() as session:
@@ -390,13 +366,13 @@ class Linker(commands.Cog):
             registered_roles = registered_roles.scalars().all()
 
             is_nick_update_target = (
-                update_nick
-                and session.execute(
-                    select(NickUpdateTargetGuild).where(
-                        NickUpdateTargetGuild.guild_id == guild.id
-                    )
-                ).scalar()
-                is not None
+                    update_nick
+                    and session.execute(
+                select(NickUpdateTargetGuild).where(
+                    NickUpdateTargetGuild.guild_id == guild.id
+                )
+            ).scalar()
+                    is not None
             )
 
         # guild内のメンバーのIDを取得
@@ -536,9 +512,9 @@ class Linker(commands.Cog):
     @slash_command(name="force_update", description="ロールの強制更新を行います")
     @commands.has_permissions(administrator=True)
     async def force_update(
-        self,
-        ctx: discord.commands.context.ApplicationContext,
-        nick: discord.Option(bool, "ニックネーム更新の要否", default=False),
+            self,
+            ctx: discord.commands.context.ApplicationContext,
+            nick: discord.Option(bool, "ニックネーム更新の要否", default=False),
     ):
         await ctx.interaction.response.defer(ephemeral=True)
         await self.update_roles_in_guild(ctx.guild, update_nick=nick)
@@ -550,9 +526,9 @@ class Linker(commands.Cog):
     )
     @commands.has_permissions(administrator=True)
     async def check_info_from_discord(
-        self,
-        ctx: discord.commands.context.ApplicationContext,
-        user: discord.Option(discord.User, "ユーザ", required=True),
+            self,
+            ctx: discord.commands.context.ApplicationContext,
+            user: discord.Option(discord.User, "ユーザ", required=True),
     ):
         await ctx.interaction.response.defer(ephemeral=True)
 
@@ -586,9 +562,9 @@ class Linker(commands.Cog):
     )
     @commands.has_permissions(administrator=True)
     async def recheck_user(
-        self,
-        ctx: discord.commands.context.ApplicationContext,
-        user: discord.Option(discord.User, "ユーザ", required=True),
+            self,
+            ctx: discord.commands.context.ApplicationContext,
+            user: discord.Option(discord.User, "ユーザ", required=True),
     ):
         await ctx.interaction.response.defer(ephemeral=True)
 
@@ -621,8 +597,8 @@ class Linker(commands.Cog):
     )
     @commands.has_permissions(administrator=True)
     async def toggle_auto_nick(
-        self,
-        ctx: discord.commands.context.ApplicationContext,
+            self,
+            ctx: discord.commands.context.ApplicationContext,
     ):
         await ctx.interaction.response.defer(ephemeral=True)
 
