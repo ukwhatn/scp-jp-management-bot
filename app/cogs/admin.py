@@ -3,7 +3,8 @@ import platform
 import sys
 import traceback
 from datetime import datetime
-from typing import Optional, Type, Any, re
+from typing import Optional, Type, Any
+import re
 
 import discord
 import psutil
