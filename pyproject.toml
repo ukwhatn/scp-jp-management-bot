@@ -1,41 +1,35 @@
 [tool.poetry]
-name = "linker-bot"
+name = "scp-jp-management-bot"
 version = "1.0.0"
-description = "A template for creating a new application"
+description = "A template for creating a new discordbot"
 authors = ["Yuki Watanabe <ukwhatn@gmail.com>"]
 package-mode = false
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = "3.12.*"
 
 [tool.poetry.group.discord]
 optional = true
 [tool.poetry.group.discord.dependencies]
+py-cord = { extras = ["speed"], version = "^2.6.1" }
+redis = "^5.0.8"
 sentry-sdk = "^2.13.0"
-py-cord = {extras = ["speed"], version = "^2.6.1"}
-newrelic = "^10.3.1"
-httpx = "^0.28.0"
+psutil = "^7.0.0"
 
 [tool.poetry.group.dev]
 optional = true
 [tool.poetry.group.dev.dependencies]
-ruff = "^0.9.2"
+ruff = "^0.11.0"
+bandit = "^1.7.8"
+semgrep = "^1.63.0"
 
 [tool.poetry.group.db]
 optional = true
 [tool.poetry.group.db.dependencies]
 sqlalchemy = "^2.0.32"
-alembic = "^1.13.2"
 psycopg2-binary = "^2.9.9"
 pydantic = "^2.8.2"
-
-[tool.poetry.group.dumper]
-optional = true
-[tool.poetry.group.dumper.dependencies]
-boto3 = "1.35.*"
-schedule = "^1.2.2"
-sentry-sdk = "^2.19.2"
-pick = "^2.4.0"
+pydantic-settings = "^2.8.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

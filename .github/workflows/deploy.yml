@@ -2,7 +2,7 @@
 name: CD
 on:
   push:
-    branches: [ main ]
+    branches: [ change_this_value_to_main ]
 jobs:
   deploy:
     runs-on: ubuntu-latest
