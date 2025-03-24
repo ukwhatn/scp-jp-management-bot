@@ -1,6 +1,7 @@
+from datetime import date
 from typing import TYPE_CHECKING, List
 
-from sqlalchemy import BigInteger, String, UniqueConstraint
+from sqlalchemy import BigInteger, String, UniqueConstraint, Date
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..base import BaseModel
@@ -20,6 +21,7 @@ class StaffApproval(BaseModel):
     title: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str] = mapped_column(String, nullable=True)
     url: Mapped[str] = mapped_column(String, nullable=True)
+    due_date: Mapped[date] = mapped_column(Date, nullable=True)
 
     # リレーション
     users: Mapped[List["StaffApprovalUser"]] = relationship(
