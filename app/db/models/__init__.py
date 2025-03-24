@@ -4,6 +4,11 @@ from .member_management import (
     SiteApplication,
     SiteApplicationNotifyChannel,
 )
+from .staff_approval import (
+    StaffApproval,
+    StaffApprovalUser,
+    StaffApprovalStatus,
+)
 
 __all__ = [
     # base
@@ -17,4 +22,8 @@ __all__ = [
     # member_management
     "SiteApplication",
     "SiteApplicationNotifyChannel",
+    # staff_approval
+    "StaffApproval",
+    "StaffApprovalUser",
+    "StaffApprovalStatus",
 ]
