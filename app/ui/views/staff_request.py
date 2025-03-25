@@ -17,10 +17,10 @@ temp_memory = TemporaryMemory()
 class CommonFunctions:
     @staticmethod
     def create_summary_embed(
-            staff_request: StaffRequest,
-            guild: discord.Guild,
-            title: str = "スタッフへの確認依頼",
-            color: discord.Color = discord.Color.teal(),
+        staff_request: StaffRequest,
+        guild: discord.Guild,
+        title: str = "スタッフへの確認依頼",
+        color: discord.Color = discord.Color.teal(),
     ):
         # created_by_idからユーザ取得
         created_by = guild.get_member(staff_request.created_by_id)
@@ -87,7 +87,7 @@ class Flow1TargetSelector(discord.ui.View):
         disabled=False,
     )
     async def select_targets(
-            self, _: discord.ui.Select, interaction: discord.Interaction
+        self, _: discord.ui.Select, interaction: discord.Interaction
     ):
         # defer
         await interaction.response.defer()
@@ -172,7 +172,7 @@ class Flow2ConfirmView(discord.ui.View):
         style=discord.ButtonStyle.primary,
     )
     async def confirm_btn(
-            self, button: discord.ui.Button, interaction: discord.Interaction
+        self, button: discord.ui.Button, interaction: discord.Interaction
     ):
         # defer
         await interaction.response.defer()
@@ -280,7 +280,7 @@ class RequestDMController(discord.ui.View):
         style=discord.ButtonStyle.success,
     )
     async def status_change_to_done(
-            self, button: discord.ui.Button, interaction: discord.Interaction
+        self, button: discord.ui.Button, interaction: discord.Interaction
     ):
         await interaction.response.defer()
 
@@ -348,7 +348,7 @@ class RequestDMControllerIsDone(discord.ui.View):
         style=discord.ButtonStyle.secondary,
     )
     async def status_change_to_pending(
-            self, button: discord.ui.Button, interaction: discord.Interaction
+        self, button: discord.ui.Button, interaction: discord.Interaction
     ):
         await interaction.response.defer()
 
@@ -421,7 +421,7 @@ class RequestSummaryFinishController(discord.ui.View):
         style=discord.ButtonStyle.success,
     )
     async def finish_due_date(
-            self, button: discord.ui.Button, interaction: discord.Interaction
+        self, button: discord.ui.Button, interaction: discord.Interaction
     ):
         await interaction.response.defer()
 
@@ -480,7 +480,7 @@ class RequestSummaryFinishController(discord.ui.View):
         style=discord.ButtonStyle.danger,
     )
     async def finish_cancel(
-            self, button: discord.ui.Button, interaction: discord.Interaction
+        self, button: discord.ui.Button, interaction: discord.Interaction
     ):
         await interaction.response.defer()
 
@@ -539,7 +539,7 @@ class RequestSummaryFinishController(discord.ui.View):
         style=discord.ButtonStyle.secondary,
     )
     async def finish_back(
-            self, button: discord.ui.Button, interaction: discord.Interaction
+        self, button: discord.ui.Button, interaction: discord.Interaction
     ):
         # viewを戻す
         await interaction.response.edit_message(view=RequestSummaryController())

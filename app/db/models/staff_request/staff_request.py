@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import List
 
-from sqlalchemy import BigInteger, String, UniqueConstraint, Date, DateTime
+from sqlalchemy import BigInteger, String, UniqueConstraint, Date, DateTime, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..base import BaseModel
@@ -25,6 +25,8 @@ class StaffRequest(BaseModel):
     description: Mapped[str] = mapped_column(String, nullable=True)
     url: Mapped[str] = mapped_column(String, nullable=True)
     due_date: Mapped[date] = mapped_column(Date, nullable=True)
+
+    is_due_date_notified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     # リレーション
     users: Mapped[List["StaffRequestUser"]] = relationship(
