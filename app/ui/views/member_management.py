@@ -6,22 +6,7 @@ from scp_jp.api.member_management import PermissionLevel, DeclineReasonType
 from core import get_settings
 from db import db_session
 from db.models import SiteApplication
-
-
-# インメモリキャッシュ
-class TemporaryMemory:
-    def __init__(self):
-        self.memory = {}
-
-    def set(self, key, value):
-        self.memory[key] = value
-
-    def get(self, key):
-        return self.memory.get(key)
-
-    def delete(self, key):
-        del self.memory[key]
-
+from utils.temporary_memory import TemporaryMemory
 
 # インメモリキャッシュのインスタンス
 temp_memory = TemporaryMemory()
