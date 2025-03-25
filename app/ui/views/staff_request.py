@@ -17,16 +17,19 @@ temp_memory = TemporaryMemory()
 class CommonFunctions:
     @staticmethod
     def create_summary_embed(
-            staff_request: StaffRequest, interaction: discord.Interaction
+            staff_request: StaffRequest,
+            guild: discord.Guild,
+            title: str = "スタッフへの確認依頼",
+            color: discord.Color = discord.Color.teal(),
     ):
         # created_by_idからユーザ取得
-        created_by = interaction.guild.get_member(staff_request.created_by_id)
+        created_by = guild.get_member(staff_request.created_by_id)
 
         # Embed作成
         embed = (
             discord.Embed(
-                color=discord.Color.teal(),
-                title="確認依頼済",
+                color=color,
+                title=title,
                 timestamp=datetime.now(),
             )
             .add_field(name="タイトル", value=staff_request.title, inline=False)
@@ -53,9 +56,16 @@ class CommonFunctions:
             if not users:
                 continue
 
+            discord_users = []
+            for user in users:
+                discord_user = guild.get_member(user.user_id)
+                if discord_user:
+                    discord_users.append(discord_user)
+                    continue
+
             embed.add_field(
                 name=f"ステータス: {StaffRequestStatus.name_ja(status)} -> {len(users)}名",
-                value=" ".join([user.user.mention for user in users])
+                value=" ".join([_du.mention for _du in discord_users])
                 if len(users) > 0
                 else "なし",
                 inline=False,
@@ -193,7 +203,7 @@ class Flow2ConfirmView(discord.ui.View):
 
         summary_msg = await interaction.followup.send(
             embed=CommonFunctions.create_summary_embed(
-                staff_request, interaction
+                staff_request, interaction.message.guild
             ).add_field(
                 name=f"ステータス: 未対応 -> {len(data['targets'])}名",
                 value=" ".join([target.mention for target in data["targets"]])
@@ -226,9 +236,7 @@ class Flow2ConfirmView(discord.ui.View):
                         color=discord.Color.orange(),
                         url=summary_msg.jump_url,
                     )
-                    .add_field(
-                        name="タイトル", value=staff_request.title, inline=False
-                    )
+                    .add_field(name="タイトル", value=staff_request.title, inline=False)
                     .add_field(
                         name="説明", value=staff_request.description, inline=False
                     )
@@ -294,6 +302,7 @@ class RequestDMController(discord.ui.View):
             # ステータスの変更
             staff_request_user.status = StaffRequestStatus.DONE
             db.commit()
+            db.refresh(staff_request_user)
 
             # DMメッセージを更新
             dm_embed = interaction.message.embeds[0]
@@ -306,7 +315,9 @@ class RequestDMController(discord.ui.View):
 
             # 元メッセージを更新
             summary_guild_id = staff_request_user.staff_request.summary_message_guild_id
-            summary_channel_id = staff_request_user.staff_request.summary_message_channel_id
+            summary_channel_id = (
+                staff_request_user.staff_request.summary_message_channel_id
+            )
             summary_message_id = staff_request_user.staff_request.summary_message_id
 
             summary_guild = interaction.client.get_guild(summary_guild_id)
@@ -315,9 +326,16 @@ class RequestDMController(discord.ui.View):
 
             await summary_message.edit(
                 embed=CommonFunctions.create_summary_embed(
-                    staff_request_user.staff_request, interaction),
-                view=RequestSummaryController()
+                    staff_request_user.staff_request, summary_guild
+                ),
+                view=RequestSummaryController(),
             )
+
+            # pendingが居なくなった場合、通知する
+            if len(staff_request_user.staff_request.pending_users) == 0:
+                await summary_message.reply(
+                    f"<@{staff_request_user.staff_request.created_by_id}> 全ての依頼者の対応が完了しました"
+                )
 
 
 class RequestDMControllerIsDone(discord.ui.View):
@@ -352,19 +370,20 @@ class RequestDMControllerIsDone(discord.ui.View):
             # ステータスの変更
             staff_request_user.status = StaffRequestStatus.PENDING
             db.commit()
+            db.refresh(staff_request_user)
 
             # DMメッセージを更新
             dm_embed = interaction.message.embeds[0]
             dm_embed.colour = discord.Color.orange()
             dm_embed.set_footer(text="未対応")
 
-            await interaction.message.edit(
-                embed=dm_embed, view=RequestDMController()
-            )
+            await interaction.message.edit(embed=dm_embed, view=RequestDMController())
 
             # 元メッセージを更新
             summary_guild_id = staff_request_user.staff_request.summary_message_guild_id
-            summary_channel_id = staff_request_user.staff_request.summary_message_channel_id
+            summary_channel_id = (
+                staff_request_user.staff_request.summary_message_channel_id
+            )
             summary_message_id = staff_request_user.staff_request.summary_message_id
 
             summary_guild = interaction.client.get_guild(summary_guild_id)
@@ -373,8 +392,9 @@ class RequestDMControllerIsDone(discord.ui.View):
 
             await summary_message.edit(
                 embed=CommonFunctions.create_summary_embed(
-                    staff_request_user.staff_request, interaction),
-                view=RequestSummaryController()
+                    staff_request_user.staff_request, summary_guild
+                ),
+                view=RequestSummaryController(),
             )
 
 
@@ -387,9 +407,7 @@ class RequestSummaryController(discord.ui.View):
         custom_id="application_summary_controller_finish",
         style=discord.ButtonStyle.danger,
     )
-    async def finish(
-            self, button: discord.ui.Button, interaction: discord.Interaction
-    ):
+    async def finish(self, button: discord.ui.Button, interaction: discord.Interaction):
         await interaction.response.edit_message(view=RequestSummaryFinishController())
 
 
@@ -422,25 +440,38 @@ class RequestSummaryFinishController(discord.ui.View):
                 )
                 return
 
-            # pendingをexpiredに変更
+            # DMメッセージを更新
             for user in staff_request.pending_users:
+                _du = interaction.guild.get_member(user.user_id)
+                if _du is None:
+                    continue
+
+                _dm = await _du.create_dm()
+
+                dm_message = await _dm.fetch_message(user.dm_message_id)
+
+                if not dm_message:
+                    continue
+
+                dm_embed = dm_message.embeds[0]
+                dm_embed.colour = discord.Color.red()
+                dm_embed.set_footer(text="締め切られました")
+                await dm_message.edit(embed=dm_embed, view=None)
+
                 user.status = StaffRequestStatus.EXPIRED
 
             db.commit()
             db.refresh(staff_request)
 
-            # DMメッセージを更新
-            for user in staff_request.pending_users:
-                dm_message = await interaction.channel.fetch_message(user.dm_message_id)
-                dm_embed = dm_message.embeds[0]
-                dm_embed.colour = discord.Color.red()
-                dm_embed.set_footer(text="期限切れ")
-                await dm_message.edit(embed=dm_embed, view=RequestDMControllerIsDone())
-
             # サマリメッセージを更新
             await interaction.message.edit(
-                embed=CommonFunctions.create_summary_embed(staff_request, interaction),
-                view=RequestSummaryController()
+                embed=CommonFunctions.create_summary_embed(
+                    staff_request,
+                    interaction.guild,
+                    title="[締切]スタッフへの確認依頼",
+                    color=discord.Color.light_gray(),
+                ),
+                view=None,
             )
 
     @discord.ui.button(
@@ -468,25 +499,38 @@ class RequestSummaryFinishController(discord.ui.View):
                 )
                 return
 
-            # pendingをcanceled_by_requesterに変更
+            # DMメッセージを更新
             for user in staff_request.pending_users:
+                _du = interaction.guild.get_member(user.user_id)
+                if _du is None:
+                    continue
+
+                _dm = await _du.create_dm()
+
+                dm_message = await _dm.fetch_message(user.dm_message_id)
+
+                if not dm_message:
+                    continue
+
+                dm_embed = dm_message.embeds[0]
+                dm_embed.colour = discord.Color.red()
+                dm_embed.set_footer(text="キャンセルされました")
+                await dm_message.edit(embed=dm_embed, view=None)
+
                 user.status = StaffRequestStatus.CANCELED_BY_REQUESTER
 
             db.commit()
             db.refresh(staff_request)
 
-            # DMメッセージを更新
-            for user in staff_request.pending_users:
-                dm_message = await interaction.channel.fetch_message(user.dm_message_id)
-                dm_embed = dm_message.embeds[0]
-                dm_embed.colour = discord.Color.red()
-                dm_embed.set_footer(text="申請者により取り消し")
-                await dm_message.edit(embed=dm_embed, view=RequestDMControllerIsDone())
-
             # サマリメッセージを更新
             await interaction.message.edit(
-                embed=CommonFunctions.create_summary_embed(staff_request, interaction),
-                view=RequestSummaryController()
+                embed=CommonFunctions.create_summary_embed(
+                    staff_request,
+                    interaction.guild,
+                    title="[キャンセル]スタッフへの確認依頼",
+                    color=discord.Color.dark_red(),
+                ),
+                view=None,
             )
 
     @discord.ui.button(

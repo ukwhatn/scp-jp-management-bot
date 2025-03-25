@@ -11,7 +11,7 @@ from ui.views.staff_request import (
     RequestDMController,
     RequestDMControllerIsDone,
     RequestSummaryController,
-    RequestSummaryFinishController
+    RequestSummaryFinishController,
 )
 
 
