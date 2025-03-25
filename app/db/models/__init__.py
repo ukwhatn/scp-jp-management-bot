@@ -4,6 +4,7 @@ from .member_management import (
     SiteApplication,
     SiteApplicationNotifyChannel,
 )
+from .privilege_management import PrivilegeRemoveQueue
 from .staff_request import (
     StaffRequest,
     StaffRequestUser,
@@ -22,6 +23,8 @@ __all__ = [
     # member_management
     "SiteApplication",
     "SiteApplicationNotifyChannel",
+    # privilege_management
+    "PrivilegeRemoveQueue",
     # staff_request
     "StaffRequest",
     "StaffRequestUser",
