@@ -321,7 +321,15 @@ class RequestDMController(discord.ui.View):
             summary_message_id = staff_request_user.staff_request.summary_message_id
 
             summary_guild = interaction.client.get_guild(summary_guild_id)
+
+            if summary_guild is None:
+                summary_guild = await interaction.client.fetch_guild(summary_guild_id)
+
             summary_channel = summary_guild.get_channel(summary_channel_id)
+
+            if summary_channel is None:
+                summary_channel = await summary_guild.fetch_channel(summary_channel_id)
+
             summary_message = await summary_channel.fetch_message(summary_message_id)
 
             await summary_message.edit(
