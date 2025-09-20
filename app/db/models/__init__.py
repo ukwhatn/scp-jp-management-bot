@@ -10,6 +10,10 @@ from .staff_request import (
     StaffRequestUser,
     StaffRequestStatus,
 )
+from .role_group import (
+    RoleGroup,
+    RoleGroupRole,
+)
 
 __all__ = [
     # base
@@ -29,4 +33,7 @@ __all__ = [
     "StaffRequest",
     "StaffRequestUser",
     "StaffRequestStatus",
+    # role_group
+    "RoleGroup",
+    "RoleGroupRole",
 ]

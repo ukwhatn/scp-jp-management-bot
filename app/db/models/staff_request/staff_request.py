@@ -26,7 +26,9 @@ class StaffRequest(BaseModel):
     url: Mapped[str] = mapped_column(String, nullable=True)
     due_date: Mapped[date] = mapped_column(Date, nullable=True)
 
-    is_due_date_notified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_due_date_notified: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
 
     # リレーション
     users: Mapped[List["StaffRequestUser"]] = relationship(
