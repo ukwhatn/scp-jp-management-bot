@@ -22,7 +22,7 @@ class GetPrivilegeButton(discord.ui.View):
         emoji="⚠️",
     )
     async def get_privilege_button(
-            self, button: discord.ui.Button, interaction: discord.Interaction
+        self, button: discord.ui.Button, interaction: discord.Interaction
     ):
         # defer
         await interaction.response.defer()
@@ -38,7 +38,7 @@ class GetPrivilegeButton(discord.ui.View):
         await interaction.followup.send(
             "権限を取得するサイトを選択してください",
             ephemeral=True,
-            view=GetPrivilegeSiteSelector(sites)
+            view=GetPrivilegeSiteSelector(sites),
         )
 
 
@@ -71,9 +71,7 @@ class GetPrivilegeSiteSelector(discord.ui.View):
             await interaction.response.defer()
 
             await interaction.followup.edit_message(
-                content="処理中です.....",
-                view=None,
-                message_id=interaction.message.id
+                content="処理中です.....", view=None, message_id=interaction.message.id
             )
 
             # get selected site
@@ -112,9 +110,14 @@ class GetPrivilegeSiteSelector(discord.ui.View):
 
                     for _membership in _wd_acc.site_memberships:
                         if _membership["site_id"] == selected_site_id:
-                            if _membership["permission_level"] >= PermissionLevel.MODERATOR:
+                            if (
+                                _membership["permission_level"]
+                                >= PermissionLevel.MODERATOR
+                            ):
                                 target_wd_account = wd_acc
-                                target_permission_level = _membership["permission_level"]
+                                target_permission_level = _membership[
+                                    "permission_level"
+                                ]
                                 break
                 except HTTPStatusError:
                     continue
@@ -127,7 +130,11 @@ class GetPrivilegeSiteSelector(discord.ui.View):
                 return
 
             # 権限昇格を実施
-            action = "to_admin" if target_permission_level >= PermissionLevel.ADMIN else "to_moderator"
+            action = (
+                "to_admin"
+                if target_permission_level >= PermissionLevel.ADMIN
+                else "to_moderator"
+            )
             try:
                 await c_manage.change_site_member_privilege(
                     site_id=selected_site_id,
@@ -139,7 +146,7 @@ class GetPrivilegeSiteSelector(discord.ui.View):
                     f"> ユーザ: {interaction.user.name} ({target_wd_account.username})\n"
                     f"> サイト: {self.sites[selected_site_id].name}\n"
                     f"> 権限: {action.removeprefix('to_')}",
-                    view=PrivilegeRemoveButton()
+                    view=PrivilegeRemoveButton(),
                 )
             except HTTPStatusError as e:
                 await interaction.followup.send(
@@ -152,7 +159,9 @@ class GetPrivilegeSiteSelector(discord.ui.View):
             with db_session() as session:
                 # 権限剥奪キューに追加
                 # expired_atは1時間後
-                notify_msg = await interaction.channel.fetch_message(notify_msg_partial.id)
+                notify_msg = await interaction.channel.fetch_message(
+                    notify_msg_partial.id
+                )
                 privilege_remove_queue = PrivilegeRemoveQueue(
                     dc_user_id=interaction.user.id,
                     wd_user_id=target_wd_account.id,
@@ -181,7 +190,7 @@ class PrivilegeRemoveButton(discord.ui.View):
         emoji="✅",
     )
     async def remove_privilege_button(
-            self, button: discord.ui.Button, interaction: discord.Interaction
+        self, button: discord.ui.Button, interaction: discord.Interaction
     ):
         # defer
         await interaction.response.defer()
@@ -195,11 +204,15 @@ class PrivilegeRemoveButton(discord.ui.View):
 
         # get queue
         with db_session() as session:
-            queue = session.query(PrivilegeRemoveQueue).filter(
-                PrivilegeRemoveQueue.notify_guild_id == interaction.guild.id,
-                PrivilegeRemoveQueue.notify_channel_id == interaction.channel.id,
-                PrivilegeRemoveQueue.notify_message_id == interaction.message.id,
-            ).first()
+            queue = (
+                session.query(PrivilegeRemoveQueue)
+                .filter(
+                    PrivilegeRemoveQueue.notify_guild_id == interaction.guild.id,
+                    PrivilegeRemoveQueue.notify_channel_id == interaction.channel.id,
+                    PrivilegeRemoveQueue.notify_message_id == interaction.message.id,
+                )
+                .first()
+            )
 
             if queue is None:
                 await interaction.followup.send(

@@ -9,10 +9,7 @@ from scp_jp.api import MemberManagementAPIClient
 from core import get_settings
 from db.connection import db_session
 from db.models.privilege_management import PrivilegeRemoveQueue
-from ui.views.privilege_management import (
-    GetPrivilegeButton,
-    PrivilegeRemoveButton
-)
+from ui.views.privilege_management import GetPrivilegeButton, PrivilegeRemoveButton
 
 
 class PrivilegeManagement(commands.Cog):
@@ -50,20 +47,24 @@ class PrivilegeManagement(commands.Cog):
     # 承認処理の追加
     # ==============================
 
-    @group_privilege.command(name="send_panel", description="スタッフの権限昇格を管理するパネルを表示します")
+    @group_privilege.command(
+        name="send_panel", description="スタッフの権限昇格を管理するパネルを表示します"
+    )
     async def send_panel(self, ctx: discord.ApplicationContext):
         await ctx.respond(
-            "\n".join([
-                "## 権限昇格管理パネル",
-                "Wiki上で権限を取得する場合は、以下のボタンを押してください。",
-                "",
-                "- 権限は、システム上の権限レベルに合わせてAdmin/Moderatorが自動的に選択されます",
-                "- 権限の取得・剥奪は記録されます",
-                "- 権限は1時間後に自動的に剥奪されます",
-                "",
-                "- **この作業を実施することについてスタッフ合意を取っていない場合は、まずリアクション投票による合意形成を行ってください**"
-            ]),
-            view=GetPrivilegeButton()
+            "\n".join(
+                [
+                    "## 権限昇格管理パネル",
+                    "Wiki上で権限を取得する場合は、以下のボタンを押してください。",
+                    "",
+                    "- 権限は、システム上の権限レベルに合わせてAdmin/Moderatorが自動的に選択されます",
+                    "- 権限の取得・剥奪は記録されます",
+                    "- 権限は1時間後に自動的に剥奪されます",
+                    "",
+                    "- **この作業を実施することについてスタッフ合意を取っていない場合は、まずリアクション投票による合意形成を行ってください**",
+                ]
+            ),
+            view=GetPrivilegeButton(),
         )
 
     # ==============================
@@ -74,9 +75,11 @@ class PrivilegeManagement(commands.Cog):
     async def privilege_remover(self):
         with db_session() as session:
             # expired_atが過ぎた権限剥奪リクエストを取得
-            expired_queues = session.query(PrivilegeRemoveQueue).filter(
-                PrivilegeRemoveQueue.expired_at <= datetime.now()
-            ).all()
+            expired_queues = (
+                session.query(PrivilegeRemoveQueue)
+                .filter(PrivilegeRemoveQueue.expired_at <= datetime.now())
+                .all()
+            )
 
             c_manage = MemberManagementAPIClient(
                 self.settings.MEMBER_MANAGEMENT_API_URL,

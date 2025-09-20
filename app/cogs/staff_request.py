@@ -76,10 +76,14 @@ class StaffRequest(commands.Cog):
         # due_dateを過ぎたタスクをcreated_by_idに通知する
         with db_session() as db:
             # 親エントリからdue_dateが過ぎた、かつis_due_date_notifiedがFalseなものを取得
-            staff_requests = db.query(DbSr).filter(
-                DbSr.due_date < datetime.date.today(),
-                DbSr.is_due_date_notified.is_(False),
-            ).all()
+            staff_requests = (
+                db.query(DbSr)
+                .filter(
+                    DbSr.due_date < datetime.date.today(),
+                    DbSr.is_due_date_notified.is_(False),
+                )
+                .all()
+            )
 
             for sr in staff_requests:
                 # pendingなタスクがなければスキップ
@@ -88,8 +92,12 @@ class StaffRequest(commands.Cog):
 
                 author = self.bot.get_user(sr.created_by_id)
                 original_guild = self.bot.get_guild(sr.summary_message_guild_id)
-                original_channel = original_guild.get_channel(sr.summary_message_channel_id)
-                original_message = await original_channel.fetch_message(sr.summary_message_id)
+                original_channel = original_guild.get_channel(
+                    sr.summary_message_channel_id
+                )
+                original_message = await original_channel.fetch_message(
+                    sr.summary_message_id
+                )
 
                 await original_message.reply(
                     f"{author.mention} 依頼の期限が過ぎました\n"
@@ -142,7 +150,9 @@ class StaffRequest(commands.Cog):
                         # DMを送信
                         _du = self.bot.get_user(sr_u.user_id)
                         if _du is None:
-                            self.logger.warning(f"ユーザID {sr_u.user_id} が見つかりません")
+                            self.logger.warning(
+                                f"ユーザID {sr_u.user_id} が見つかりません"
+                            )
                             continue
 
                         _dm = await _du.create_dm()
@@ -152,7 +162,9 @@ class StaffRequest(commands.Cog):
 
                         msg_content = "**対応が必要な依頼があります。ご確認ください。**"
                         if sr.due_date is not None:
-                            msg_content += f"\n> 期限: {sr.due_date.strftime('%Y/%m/%d')}"
+                            msg_content += (
+                                f"\n> 期限: {sr.due_date.strftime('%Y/%m/%d')}"
+                            )
 
                         # replyでリマインド
                         await _dm_msg.reply(msg_content)
