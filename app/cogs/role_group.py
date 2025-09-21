@@ -460,13 +460,12 @@ class RoleGroupCog(commands.Cog):
             )
 
     # ==============================
-    # ロール適用（全ギルド対応）
+    # ロール適用
     # ==============================
 
     @group_rolegroup.command(
         name="apply", description="ユーザーにロールグループのロールを適用します"
     )
-
     async def apply_roles(
         self,
         ctx: discord.ApplicationContext,
@@ -475,7 +474,7 @@ class RoleGroupCog(commands.Cog):
         ),
         user_mentions: discord.Option(str, "対象ユーザー（メンション形式）"),
     ):
-        """ユーザーにロールグループのロールを適用（全ギルド対応）"""
+        """ユーザーにロールグループのロールを適用"""
         if not self.check_manage_roles_permission(ctx):
             await ctx.respond(
                 "❌ このコマンドを使用するには `ロールの管理` 権限が必要です。",
@@ -604,13 +603,12 @@ class RoleGroupCog(commands.Cog):
             )
 
     # ==============================
-    # ロール削除（全ギルド対応）
+    # ロール削除
     # ==============================
 
     @group_rolegroup.command(
         name="remove", description="ユーザーからロールグループのロールを削除します"
     )
-
     async def remove_roles(
         self,
         ctx: discord.ApplicationContext,
@@ -619,7 +617,7 @@ class RoleGroupCog(commands.Cog):
         ),
         user_mentions: discord.Option(str, "対象ユーザー（メンション形式）"),
     ):
-        """ユーザーからロールグループのロールを削除（全ギルド対応）"""
+        """ユーザーからロールグループのロールを削除"""
         if not self.check_manage_roles_permission(ctx):
             await ctx.respond(
                 "❌ このコマンドを使用するには `ロールの管理` 権限が必要です。",
