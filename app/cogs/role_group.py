@@ -463,6 +463,10 @@ class RoleGroupCog(commands.Cog):
     # ロール適用（全ギルド対応）
     # ==============================
 
+    @group_rolegroup.command(
+        name="apply", description="ユーザーにロールグループのロールを適用します"
+    )
+
     async def apply_roles(
         self,
         ctx: discord.ApplicationContext,
@@ -602,6 +606,10 @@ class RoleGroupCog(commands.Cog):
     # ==============================
     # ロール削除（全ギルド対応）
     # ==============================
+
+    @group_rolegroup.command(
+        name="remove", description="ユーザーからロールグループのロールを削除します"
+    )
 
     async def remove_roles(
         self,
