@@ -460,7 +460,7 @@ class RoleGroupCog(commands.Cog):
             )
 
     # ==============================
-    # ロール適用（全ギルド対応）
+    # ロール適用
     # ==============================
 
     @group_rolegroup.command(
@@ -474,7 +474,7 @@ class RoleGroupCog(commands.Cog):
         ),
         user_mentions: discord.Option(str, "対象ユーザー（メンション形式）"),
     ):
-        """ユーザーにロールグループのロールを適用（全ギルド対応）"""
+        """ユーザーにロールグループのロールを適用"""
         if not self.check_manage_roles_permission(ctx):
             await ctx.respond(
                 "❌ このコマンドを使用するには `ロールの管理` 権限が必要です。",
@@ -482,11 +482,14 @@ class RoleGroupCog(commands.Cog):
             )
             return
 
+        # 長時間処理のためdefer
+        await ctx.defer(ephemeral=True)
+
         try:
             # ユーザーIDを抽出
             user_ids = self.parse_mentions(user_mentions, "user")
             if not user_ids:
-                await ctx.respond(
+                await ctx.followup.send(
                     "❌ 有効なユーザーメンションが見つかりません。", ephemeral=True
                 )
                 return
@@ -500,13 +503,13 @@ class RoleGroupCog(commands.Cog):
                 )
 
                 if not group:
-                    await ctx.respond(
+                    await ctx.followup.send(
                         f"❌ グループ `{group_name}` が見つかりません。", ephemeral=True
                     )
                     return
 
                 if not group.roles:
-                    await ctx.respond(
+                    await ctx.followup.send(
                         f"❌ グループ `{group_name}` にはロールが含まれていません。",
                         ephemeral=True,
                     )
@@ -591,16 +594,16 @@ class RoleGroupCog(commands.Cog):
                     color=discord.Color.green(),
                 )
 
-                await ctx.respond(embed=embed, ephemeral=True)
+                await ctx.followup.send(embed=embed, ephemeral=True)
 
         except Exception as e:
             self.logger.error(f"Error applying role group: {e}")
-            await ctx.respond(
+            await ctx.followup.send(
                 "❌ ロールの適用中にエラーが発生しました。", ephemeral=True
             )
 
     # ==============================
-    # ロール削除（全ギルド対応）
+    # ロール削除
     # ==============================
 
     @group_rolegroup.command(
@@ -614,7 +617,7 @@ class RoleGroupCog(commands.Cog):
         ),
         user_mentions: discord.Option(str, "対象ユーザー（メンション形式）"),
     ):
-        """ユーザーからロールグループのロールを削除（全ギルド対応）"""
+        """ユーザーからロールグループのロールを削除"""
         if not self.check_manage_roles_permission(ctx):
             await ctx.respond(
                 "❌ このコマンドを使用するには `ロールの管理` 権限が必要です。",
@@ -622,11 +625,14 @@ class RoleGroupCog(commands.Cog):
             )
             return
 
+        # 長時間処理のためdefer
+        await ctx.defer(ephemeral=True)
+
         try:
             # ユーザーIDを抽出
             user_ids = self.parse_mentions(user_mentions, "user")
             if not user_ids:
-                await ctx.respond(
+                await ctx.followup.send(
                     "❌ 有効なユーザーメンションが見つかりません。", ephemeral=True
                 )
                 return
@@ -640,13 +646,13 @@ class RoleGroupCog(commands.Cog):
                 )
 
                 if not group:
-                    await ctx.respond(
+                    await ctx.followup.send(
                         f"❌ グループ `{group_name}` が見つかりません。", ephemeral=True
                     )
                     return
 
                 if not group.roles:
-                    await ctx.respond(
+                    await ctx.followup.send(
                         f"❌ グループ `{group_name}` にはロールが含まれていません。",
                         ephemeral=True,
                     )
@@ -731,11 +737,11 @@ class RoleGroupCog(commands.Cog):
                     color=discord.Color.red(),
                 )
 
-                await ctx.respond(embed=embed, ephemeral=True)
+                await ctx.followup.send(embed=embed, ephemeral=True)
 
         except Exception as e:
             self.logger.error(f"Error removing role group: {e}")
-            await ctx.respond(
+            await ctx.followup.send(
                 "❌ ロールの削除中にエラーが発生しました。", ephemeral=True
             )
 
