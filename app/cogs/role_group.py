@@ -1,5 +1,6 @@
 import logging
 import re
+from collections import defaultdict
 from typing import List
 
 import discord
@@ -459,7 +460,7 @@ class RoleGroupCog(commands.Cog):
             )
 
     # ==============================
-    # ロール適用
+    # ロール適用（全ギルド対応）
     # ==============================
 
     @group_rolegroup.command(
@@ -473,7 +474,7 @@ class RoleGroupCog(commands.Cog):
         ),
         user_mentions: discord.Option(str, "対象ユーザー（メンション形式）"),
     ):
-        """ユーザーにロールグループのロールを適用"""
+        """ユーザーにロールグループのロールを適用（全ギルド対応）"""
         if not self.check_manage_roles_permission(ctx):
             await ctx.respond(
                 "❌ このコマンドを使用するには `ロールの管理` 権限が必要です。",
@@ -504,67 +505,86 @@ class RoleGroupCog(commands.Cog):
                     )
                     return
 
-                # このギルドのロールのみを取得
-                guild_roles = [r for r in group.roles if r.guild_id == ctx.guild.id]
-                if not guild_roles:
+                if not group.roles:
                     await ctx.respond(
-                        f"❌ グループ `{group_name}` にはこのサーバーのロールが含まれていません。",
+                        f"❌ グループ `{group_name}` にはロールが含まれていません。",
                         ephemeral=True,
                     )
                     return
 
+                # ギルドごとにロールをまとめる
+                roles_by_guild = defaultdict(list)
+                for role_group_role in group.roles:
+                    roles_by_guild[role_group_role.guild_id].append(role_group_role)
+
                 results = []
 
                 for user_id in user_ids:
-                    member = ctx.guild.get_member(user_id)
-                    if not member:
-                        results.append(f"<@{user_id}> - ❌ メンバーが見つかりません")
-                        continue
+                    user_results = []
 
-                    added_roles = []
-                    skipped_roles = []
-
-                    for role_group_role in guild_roles:
-                        role = ctx.guild.get_role(role_group_role.role_id)
-                        if not role:
-                            skipped_roles.append(
-                                f"ID:{role_group_role.role_id} (削除済み)"
-                            )
+                    # 各ギルドでロールを処理
+                    for guild_id, guild_roles in roles_by_guild.items():
+                        guild = self.bot.get_guild(guild_id)
+                        if not guild:
+                            user_results.append(f"ギルド不明(ID:{guild_id}): スキップ")
                             continue
 
-                        # Botがそのロールを管理できるかチェック
-                        if role >= ctx.guild.me.top_role:
-                            skipped_roles.append(f"{role.name} (Botより高位)")
+                        member = guild.get_member(user_id)
+                        if not member:
+                            user_results.append(f"{guild.name}: メンバーではありません")
                             continue
 
-                        # ユーザーが既にロールを持っているかチェック
-                        if role in member.roles:
-                            skipped_roles.append(f"{role.name} (既に所持)")
-                            continue
+                        added_roles = []
+                        skipped_roles = []
 
-                        try:
-                            await member.add_roles(
-                                role, reason=f"ロールグループ '{group_name}' を適用"
-                            )
-                            added_roles.append(role.name)
-                        except discord.Forbidden:
-                            skipped_roles.append(f"{role.name} (権限不足)")
-                        except discord.HTTPException as e:
-                            skipped_roles.append(f"{role.name} (エラー: {e})")
+                        for role_group_role in guild_roles:
+                            role = guild.get_role(role_group_role.role_id)
+                            if not role:
+                                skipped_roles.append(
+                                    f"ID:{role_group_role.role_id}(削除済み)"
+                                )
+                                continue
 
-                    # 結果をまとめる
-                    result_parts = [f"{member.display_name}"]
-                    if added_roles:
-                        result_parts.append(f"✅ 追加: {', '.join(added_roles)}")
-                    if skipped_roles:
-                        result_parts.append(f"⚠️ スキップ: {', '.join(skipped_roles)}")
+                            # Botがそのロールを管理できるかチェック
+                            if role >= guild.me.top_role:
+                                skipped_roles.append(f"{role.name}(Botより高位)")
+                                continue
 
-                    results.append(" - ".join(result_parts))
+                            # ユーザーが既にロールを持っているかチェック
+                            if role in member.roles:
+                                skipped_roles.append(f"{role.name}(既に所持)")
+                                continue
+
+                            try:
+                                await member.add_roles(
+                                    role, reason=f"ロールグループ '{group_name}' を適用"
+                                )
+                                added_roles.append(role.name)
+                            except discord.Forbidden:
+                                skipped_roles.append(f"{role.name}(権限不足)")
+                            except discord.HTTPException:
+                                skipped_roles.append(f"{role.name}(エラー)")
+
+                        # このギルドの結果をまとめる
+                        guild_result_parts = [f"**{guild.name}**"]
+                        if added_roles:
+                            guild_result_parts.append(f"✅ {', '.join(added_roles)}")
+                        if skipped_roles:
+                            guild_result_parts.append(f"⚠️ {', '.join(skipped_roles)}")
+
+                        if len(guild_result_parts) > 1:
+                            user_results.append(" - ".join(guild_result_parts))
+
+                    # ユーザー全体の結果をまとめる
+                    if user_results:
+                        results.append(f"<@{user_id}>:\n  " + "\n  ".join(user_results))
+                    else:
+                        results.append(f"<@{user_id}>: 操作対象なし")
 
                 # 結果を表示
-                description = "\n".join(results[:20])
-                if len(results) > 20:
-                    description += "\n..."
+                description = "\n\n".join(results[:10])
+                if len(results) > 10:
+                    description += "\n\n..."
                 embed = discord.Embed(
                     title=f"ロールグループ `{group_name}` を適用",
                     description=description,
@@ -580,7 +600,7 @@ class RoleGroupCog(commands.Cog):
             )
 
     # ==============================
-    # ロール削除
+    # ロール削除（全ギルド対応）
     # ==============================
 
     @group_rolegroup.command(
@@ -594,7 +614,7 @@ class RoleGroupCog(commands.Cog):
         ),
         user_mentions: discord.Option(str, "対象ユーザー（メンション形式）"),
     ):
-        """ユーザーからロールグループのロールを削除"""
+        """ユーザーからロールグループのロールを削除（全ギルド対応）"""
         if not self.check_manage_roles_permission(ctx):
             await ctx.respond(
                 "❌ このコマンドを使用するには `ロールの管理` 権限が必要です。",
@@ -625,67 +645,86 @@ class RoleGroupCog(commands.Cog):
                     )
                     return
 
-                # このギルドのロールのみを取得
-                guild_roles = [r for r in group.roles if r.guild_id == ctx.guild.id]
-                if not guild_roles:
+                if not group.roles:
                     await ctx.respond(
-                        f"❌ グループ `{group_name}` にはこのサーバーのロールが含まれていません。",
+                        f"❌ グループ `{group_name}` にはロールが含まれていません。",
                         ephemeral=True,
                     )
                     return
 
+                # ギルドごとにロールをまとめる
+                roles_by_guild = defaultdict(list)
+                for role_group_role in group.roles:
+                    roles_by_guild[role_group_role.guild_id].append(role_group_role)
+
                 results = []
 
                 for user_id in user_ids:
-                    member = ctx.guild.get_member(user_id)
-                    if not member:
-                        results.append(f"<@{user_id}> - ❌ メンバーが見つかりません")
-                        continue
+                    user_results = []
 
-                    removed_roles = []
-                    skipped_roles = []
-
-                    for role_group_role in guild_roles:
-                        role = ctx.guild.get_role(role_group_role.role_id)
-                        if not role:
-                            skipped_roles.append(
-                                f"ID:{role_group_role.role_id} (削除済み)"
-                            )
+                    # 各ギルドでロールを処理
+                    for guild_id, guild_roles in roles_by_guild.items():
+                        guild = self.bot.get_guild(guild_id)
+                        if not guild:
+                            user_results.append(f"ギルド不明(ID:{guild_id}): スキップ")
                             continue
 
-                        # Botがそのロールを管理できるかチェック
-                        if role >= ctx.guild.me.top_role:
-                            skipped_roles.append(f"{role.name} (Botより高位)")
+                        member = guild.get_member(user_id)
+                        if not member:
+                            user_results.append(f"{guild.name}: メンバーではありません")
                             continue
 
-                        # ユーザーがロールを持っているかチェック
-                        if role not in member.roles:
-                            skipped_roles.append(f"{role.name} (未所持)")
-                            continue
+                        removed_roles = []
+                        skipped_roles = []
 
-                        try:
-                            await member.remove_roles(
-                                role, reason=f"ロールグループ '{group_name}' を削除"
-                            )
-                            removed_roles.append(role.name)
-                        except discord.Forbidden:
-                            skipped_roles.append(f"{role.name} (権限不足)")
-                        except discord.HTTPException as e:
-                            skipped_roles.append(f"{role.name} (エラー: {e})")
+                        for role_group_role in guild_roles:
+                            role = guild.get_role(role_group_role.role_id)
+                            if not role:
+                                skipped_roles.append(
+                                    f"ID:{role_group_role.role_id}(削除済み)"
+                                )
+                                continue
 
-                    # 結果をまとめる
-                    result_parts = [f"{member.display_name}"]
-                    if removed_roles:
-                        result_parts.append(f"✅ 削除: {', '.join(removed_roles)}")
-                    if skipped_roles:
-                        result_parts.append(f"⚠️ スキップ: {', '.join(skipped_roles)}")
+                            # Botがそのロールを管理できるかチェック
+                            if role >= guild.me.top_role:
+                                skipped_roles.append(f"{role.name}(Botより高位)")
+                                continue
 
-                    results.append(" - ".join(result_parts))
+                            # ユーザーがロールを持っているかチェック
+                            if role not in member.roles:
+                                skipped_roles.append(f"{role.name}(未所持)")
+                                continue
+
+                            try:
+                                await member.remove_roles(
+                                    role, reason=f"ロールグループ '{group_name}' を削除"
+                                )
+                                removed_roles.append(role.name)
+                            except discord.Forbidden:
+                                skipped_roles.append(f"{role.name}(権限不足)")
+                            except discord.HTTPException:
+                                skipped_roles.append(f"{role.name}(エラー)")
+
+                        # このギルドの結果をまとめる
+                        guild_result_parts = [f"**{guild.name}**"]
+                        if removed_roles:
+                            guild_result_parts.append(f"✅ {', '.join(removed_roles)}")
+                        if skipped_roles:
+                            guild_result_parts.append(f"⚠️ {', '.join(skipped_roles)}")
+
+                        if len(guild_result_parts) > 1:
+                            user_results.append(" - ".join(guild_result_parts))
+
+                    # ユーザー全体の結果をまとめる
+                    if user_results:
+                        results.append(f"<@{user_id}>:\n  " + "\n  ".join(user_results))
+                    else:
+                        results.append(f"<@{user_id}>: 操作対象なし")
 
                 # 結果を表示
-                description = "\n".join(results[:20])
-                if len(results) > 20:
-                    description += "\n..."
+                description = "\n\n".join(results[:10])
+                if len(results) > 10:
+                    description += "\n\n..."
                 embed = discord.Embed(
                     title=f"ロールグループ `{group_name}` から削除",
                     description=description,
