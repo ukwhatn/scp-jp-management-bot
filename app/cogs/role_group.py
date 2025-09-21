@@ -463,9 +463,6 @@ class RoleGroupCog(commands.Cog):
     # ロール適用（全ギルド対応）
     # ==============================
 
-    @group_rolegroup.command(
-        name="apply", description="ユーザーにロールグループのロールを適用します"
-    )
     async def apply_roles(
         self,
         ctx: discord.ApplicationContext,
@@ -482,11 +479,14 @@ class RoleGroupCog(commands.Cog):
             )
             return
 
+        # 長時間処理のためdefer
+        await ctx.defer(ephemeral=True)
+
         try:
             # ユーザーIDを抽出
             user_ids = self.parse_mentions(user_mentions, "user")
             if not user_ids:
-                await ctx.respond(
+                await ctx.followup.send(
                     "❌ 有効なユーザーメンションが見つかりません。", ephemeral=True
                 )
                 return
@@ -500,13 +500,13 @@ class RoleGroupCog(commands.Cog):
                 )
 
                 if not group:
-                    await ctx.respond(
+                    await ctx.followup.send(
                         f"❌ グループ `{group_name}` が見つかりません。", ephemeral=True
                     )
                     return
 
                 if not group.roles:
-                    await ctx.respond(
+                    await ctx.followup.send(
                         f"❌ グループ `{group_name}` にはロールが含まれていません。",
                         ephemeral=True,
                     )
@@ -591,11 +591,11 @@ class RoleGroupCog(commands.Cog):
                     color=discord.Color.green(),
                 )
 
-                await ctx.respond(embed=embed, ephemeral=True)
+                await ctx.followup.send(embed=embed, ephemeral=True)
 
         except Exception as e:
             self.logger.error(f"Error applying role group: {e}")
-            await ctx.respond(
+            await ctx.followup.send(
                 "❌ ロールの適用中にエラーが発生しました。", ephemeral=True
             )
 
@@ -603,9 +603,6 @@ class RoleGroupCog(commands.Cog):
     # ロール削除（全ギルド対応）
     # ==============================
 
-    @group_rolegroup.command(
-        name="remove", description="ユーザーからロールグループのロールを削除します"
-    )
     async def remove_roles(
         self,
         ctx: discord.ApplicationContext,
@@ -622,11 +619,14 @@ class RoleGroupCog(commands.Cog):
             )
             return
 
+        # 長時間処理のためdefer
+        await ctx.defer(ephemeral=True)
+
         try:
             # ユーザーIDを抽出
             user_ids = self.parse_mentions(user_mentions, "user")
             if not user_ids:
-                await ctx.respond(
+                await ctx.followup.send(
                     "❌ 有効なユーザーメンションが見つかりません。", ephemeral=True
                 )
                 return
@@ -640,13 +640,13 @@ class RoleGroupCog(commands.Cog):
                 )
 
                 if not group:
-                    await ctx.respond(
+                    await ctx.followup.send(
                         f"❌ グループ `{group_name}` が見つかりません。", ephemeral=True
                     )
                     return
 
                 if not group.roles:
-                    await ctx.respond(
+                    await ctx.followup.send(
                         f"❌ グループ `{group_name}` にはロールが含まれていません。",
                         ephemeral=True,
                     )
@@ -731,11 +731,11 @@ class RoleGroupCog(commands.Cog):
                     color=discord.Color.red(),
                 )
 
-                await ctx.respond(embed=embed, ephemeral=True)
+                await ctx.followup.send(embed=embed, ephemeral=True)
 
         except Exception as e:
             self.logger.error(f"Error removing role group: {e}")
-            await ctx.respond(
+            await ctx.followup.send(
                 "❌ ロールの削除中にエラーが発生しました。", ephemeral=True
             )
 
