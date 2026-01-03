@@ -15,7 +15,7 @@ py-cord = { extras = ["speed"], version = "^2.6.1" }
 redis = "^6.1.0"
 sentry-sdk = "^2.13.0"
 psutil = "^7.0.0"
-scp-jp-utils = "^1.2.1"
+httpx = "^0.28.0"
 
 [tool.poetry.group.dev]
 optional = true
