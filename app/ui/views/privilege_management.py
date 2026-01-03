@@ -108,7 +108,11 @@ class GetPrivilegeSiteSelector(discord.ui.View):
                     f"連携情報の取得に失敗しました: {e}", ephemeral=True
                 )
 
-            if not bulk_result or not bulk_result[0].linked or bulk_result[0].account is None:
+            if (
+                not bulk_result
+                or not bulk_result[0].linked
+                or bulk_result[0].account is None
+            ):
                 await interaction.followup.send(
                     f"{interaction.user.mention}\nあなたのアカウントはWikiにリンクされていません",
                 )

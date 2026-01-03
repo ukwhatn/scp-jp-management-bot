@@ -79,7 +79,11 @@ async def _handle_request(
                 f"連携情報の取得に失敗しました: {e}", ephemeral=True
             )
 
-        if not bulk_result or not bulk_result[0].linked or bulk_result[0].account is None:
+        if (
+            not bulk_result
+            or not bulk_result[0].linked
+            or bulk_result[0].account is None
+        ):
             return await interaction.followup.send(
                 "アカウント連携を完了してください。", ephemeral=True
             )
@@ -149,7 +153,7 @@ async def _handle_request(
                 reason_types = await panopticon.get_decline_reason_types()
                 reason_type_name = next(
                     (rt.name for rt in reason_types if rt.id == decline_reason_type),
-                    "不明"
+                    "不明",
                 )
                 new_embed.add_field(
                     name="却下理由",

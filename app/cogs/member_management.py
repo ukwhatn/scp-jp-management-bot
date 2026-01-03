@@ -150,9 +150,7 @@ class MemberManagement(commands.Cog):
             await ctx.followup.send(":x: APIが設定されていません", ephemeral=True)
             return
 
-        srv_sites = {
-            site.unixName: site for site in await self.panopticon.get_sites()
-        }
+        srv_sites = {site.unixName: site for site in await self.panopticon.get_sites()}
 
         with db_session() as session:
             channels = (
@@ -166,7 +164,9 @@ class MemberManagement(commands.Cog):
                     for channel in channels
                 ]
             )
-            await ctx.followup.send(msg or "通知先チャンネルは登録されていません", ephemeral=True)
+            await ctx.followup.send(
+                msg or "通知先チャンネルは登録されていません", ephemeral=True
+            )
 
     # ===== 参加申請の処理系 =====
     @tasks.loop(minutes=10)

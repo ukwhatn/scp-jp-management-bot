@@ -140,9 +140,7 @@ class LinkerUtility:
         try:
             memberships = await self.client.get_user_site_memberships(user_id)
             return any(
-                m.site is not None
-                and m.site.unixName == "scp-jp"
-                and not m.isResigned
+                m.site is not None and m.site.unixName == "scp-jp" and not m.isResigned
                 for m in memberships
             )
         except Exception as e:
