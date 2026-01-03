@@ -1,15 +1,16 @@
 import logging
 from datetime import datetime
+from typing import Optional
 
 import discord
 import httpx
 from discord.ext import commands, tasks
-from scp_jp.api import MemberManagementAPIClient
 
 from core import get_settings
 from db.connection import db_session
 from db.models.privilege_management import PrivilegeRemoveQueue
 from ui.views.privilege_management import GetPrivilegeButton, PrivilegeRemoveButton
+from utils.panopticon_client import PanopticonClient
 
 
 class PrivilegeManagement(commands.Cog):
@@ -17,6 +18,15 @@ class PrivilegeManagement(commands.Cog):
         self.bot = bot
         self.settings = get_settings()
         self.logger = logging.getLogger("discord")
+
+        # Panopticon API Client
+        if self.settings.PANOPTICON_API_URL and self.settings.PANOPTICON_API_KEY:
+            self.panopticon = PanopticonClient(
+                self.settings.PANOPTICON_API_URL,
+                self.settings.PANOPTICON_API_KEY,
+            )
+        else:
+            self.panopticon: Optional[PanopticonClient] = None
 
     # ==============================
     # イベントハンドラ
@@ -73,6 +83,9 @@ class PrivilegeManagement(commands.Cog):
 
     @tasks.loop(minutes=1)
     async def privilege_remover(self):
+        if self.panopticon is None:
+            return
+
         with db_session() as session:
             # expired_atが過ぎた権限剥奪リクエストを取得
             expired_queues = (
@@ -81,38 +94,45 @@ class PrivilegeManagement(commands.Cog):
                 .all()
             )
 
-            c_manage = MemberManagementAPIClient(
-                self.settings.MEMBER_MANAGEMENT_API_URL,
-                self.settings.MEMBER_MANAGEMENT_API_KEY,
-            )
-
             for queue in expired_queues:
+                user = None
+                message = None
                 try:
                     # get instances
                     user = self.bot.get_user(queue.dc_user_id)
                     guild = self.bot.get_guild(queue.notify_guild_id)
+                    if guild is None:
+                        continue
                     channel = guild.get_channel(queue.notify_channel_id)
+                    if channel is None:
+                        continue
                     message = await channel.fetch_message(queue.notify_message_id)
 
-                    # remove privilege
-                    await c_manage.change_site_member_privilege(
-                        site_id=queue.wd_site_id,
+                    # remove privilege (action="revoke")
+                    await self.panopticon.change_privilege(
+                        site_unix_name=queue.wd_site_unix_name,
                         user_id=queue.wd_user_id,
-                        action="remove_" + queue.permission_level,
+                        action="revoke",
                     )
                 except httpx.HTTPStatusError as e:
-                    json = e.response.json()
-                    if "User is not moderator/admin:" in json["message"]:
+                    try:
+                        json = e.response.json()
+                        if "User is not moderator/admin:" in json.get("message", ""):
+                            pass
+                    except Exception:
                         pass
+                except Exception as e:
+                    self.logger.error(f"Failed to revoke privilege: {e}")
 
                 finally:
                     # notify message
-                    await message.reply(
-                        f"{user.mention} 権限を削除しました",
-                        delete_after=5,
-                    )
-                    # delete message
-                    await message.delete(delay=5)
+                    if message and user:
+                        await message.reply(
+                            f"{user.mention} 権限を削除しました",
+                            delete_after=5,
+                        )
+                        # delete message
+                        await message.delete(delay=5)
 
                     # delete queue
                     session.delete(queue)

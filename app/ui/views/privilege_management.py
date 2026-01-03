@@ -1,14 +1,23 @@
 import datetime
+from typing import Optional
 
 import discord
 from httpx import HTTPStatusError
-from scp_jp.api import MemberManagementAPIClient, LinkerAPIClient
-from scp_jp.api.linker import AccountResponseWikidotBaseSchema
-from scp_jp.api.member_management import PermissionLevel, SiteWithMembersCount
 
 from core import get_settings
 from db import db_session
 from db.models import PrivilegeRemoveQueue
+from utils.panopticon_client import PanopticonClient, Site
+
+
+def _get_panopticon_client() -> Optional[PanopticonClient]:
+    settings = get_settings()
+    if settings.PANOPTICON_API_URL and settings.PANOPTICON_API_KEY:
+        return PanopticonClient(
+            settings.PANOPTICON_API_URL,
+            settings.PANOPTICON_API_KEY,
+        )
+    return None
 
 
 class GetPrivilegeButton(discord.ui.View):
@@ -19,7 +28,7 @@ class GetPrivilegeButton(discord.ui.View):
         label="Wiki上での権限を取得する",
         custom_id="get_privilege_button",
         style=discord.ButtonStyle.danger,
-        emoji="⚠️",
+        emoji="",
     )
     async def get_privilege_button(
         self, button: discord.ui.Button, interaction: discord.Interaction
@@ -28,12 +37,18 @@ class GetPrivilegeButton(discord.ui.View):
         await interaction.response.defer()
 
         # client
-        settings = get_settings()
-        c_manage = MemberManagementAPIClient(
-            settings.MEMBER_MANAGEMENT_API_URL,
-            settings.MEMBER_MANAGEMENT_API_KEY,
-        )
-        sites = await c_manage.get_sites()
+        panopticon = _get_panopticon_client()
+        if panopticon is None:
+            return await interaction.followup.send(
+                "APIが設定されていません", ephemeral=True
+            )
+
+        try:
+            sites = await panopticon.get_sites()
+        except Exception as e:
+            return await interaction.followup.send(
+                f"サイト一覧の取得に失敗しました: {e}", ephemeral=True
+            )
 
         await interaction.followup.send(
             "権限を取得するサイトを選択してください",
@@ -43,14 +58,14 @@ class GetPrivilegeButton(discord.ui.View):
 
 
 class GetPrivilegeSiteSelector(discord.ui.View):
-    def __init__(self, sites: list[SiteWithMembersCount]):
+    def __init__(self, sites: list[Site]):
         super().__init__(timeout=None)
-        self.sites = {site.id: site for site in sites}
+        self.sites = {site.unixName: site for site in sites}
 
         options = [
             discord.SelectOption(
                 label=site.name.upper(),
-                value=str(site.id),
+                value=site.unixName,
             )
             for site in sites
         ]
@@ -75,77 +90,68 @@ class GetPrivilegeSiteSelector(discord.ui.View):
             )
 
             # get selected site
-            selected_site_id = int(self.select.values[0])
+            selected_site_unix_name = self.select.values[0]
 
             # client
-            settings = get_settings()
-            c_manage = MemberManagementAPIClient(
-                settings.MEMBER_MANAGEMENT_API_URL,
-                settings.MEMBER_MANAGEMENT_API_KEY,
-            )
-            c_linker = LinkerAPIClient(
-                settings.LINKER_API_URL,
-                settings.LINKER_API_KEY,
-            )
+            panopticon = _get_panopticon_client()
+            if panopticon is None:
+                return await interaction.followup.send(
+                    "APIが設定されていません", ephemeral=True
+                )
 
-            # linkerでリンクされたアカウントを取得
+            # Panopticonでリンクされたアカウントを取得
             dc_user = interaction.user
-            linker_response = await c_linker.account_list([dc_user.id])
+            try:
+                bulk_result = await panopticon.link_bulk([str(dc_user.id)])
+            except Exception as e:
+                return await interaction.followup.send(
+                    f"連携情報の取得に失敗しました: {e}", ephemeral=True
+                )
 
-            wikidot_accounts = linker_response.result[str(dc_user.id)].wikidot
-
-            if not wikidot_accounts or len(wikidot_accounts) == 0:
+            if not bulk_result or not bulk_result[0].linked or bulk_result[0].account is None:
                 await interaction.followup.send(
                     f"{interaction.user.mention}\nあなたのアカウントはWikiにリンクされていません",
                 )
                 return
 
-            target_wd_account: AccountResponseWikidotBaseSchema | None = None
-            target_permission_level: PermissionLevel | None = None
+            wikidot_user_id = bulk_result[0].account.user.id
+            wikidot_username = bulk_result[0].account.user.name
 
-            # linkerでリンクされたアカウントの中から対象サイトで権限を持っているアカウントを取得
-            for wd_acc in wikidot_accounts:
-                try:
-                    _wd_acc = await c_manage.get_user(wd_acc.id)
+            # ユーザーのRBAC権限を確認（admin:{site}またはmoderate:{site}を持っているか）
+            try:
+                user_info = await panopticon.get_user(wikidot_user_id)
+            except Exception as e:
+                return await interaction.followup.send(
+                    f"ユーザー情報の取得に失敗しました: {e}", ephemeral=True
+                )
 
-                    for _membership in _wd_acc.site_memberships:
-                        if _membership["site_id"] == selected_site_id:
-                            if (
-                                _membership["permission_level"]
-                                >= PermissionLevel.MODERATOR
-                            ):
-                                target_wd_account = wd_acc
-                                target_permission_level = _membership[
-                                    "permission_level"
-                                ]
-                                break
-                except HTTPStatusError:
-                    continue
+            has_admin = panopticon.has_admin_permission(
+                user_info.permissions, selected_site_unix_name
+            )
+            has_moderate = panopticon.has_moderate_permission(
+                user_info.permissions, selected_site_unix_name
+            )
 
-            # 権限を持っているアカウントが見つからなかった場合
-            if target_wd_account is None:
+            if not has_moderate:
                 await interaction.followup.send(
-                    f"{interaction.user.mention}\nあなたのDiscordアカウントにリンクされたWikidotアカウントに、適切な権限を有するものが見つかりませんでした"
+                    f"{interaction.user.mention}\n対象サイトの権限を有するアカウントが見つかりませんでした"
                 )
                 return
 
             # 権限昇格を実施
-            action = (
-                "to_admin"
-                if target_permission_level >= PermissionLevel.ADMIN
-                else "to_moderator"
-            )
+            # panopticonはgrant/revokeのみで、RBACロールから自動判定
+            permission_level = "admin" if has_admin else "moderator"
             try:
-                await c_manage.change_site_member_privilege(
-                    site_id=selected_site_id,
-                    user_id=target_wd_account.id,
-                    action=action,
+                await panopticon.change_privilege(
+                    site_unix_name=selected_site_unix_name,
+                    user_id=wikidot_user_id,
+                    action="grant",
                 )
                 notify_msg_partial = await interaction.followup.send(
                     f"### Wikidotアカウントの権限を昇格しました\n"
-                    f"> ユーザ: {interaction.user.name} ({target_wd_account.username})\n"
-                    f"> サイト: {self.sites[selected_site_id].name}\n"
-                    f"> 権限: {action.removeprefix('to_')}",
+                    f"> ユーザ: {interaction.user.name} ({wikidot_username})\n"
+                    f"> サイト: {self.sites[selected_site_unix_name].name}\n"
+                    f"> 権限: {permission_level}",
                     view=PrivilegeRemoveButton(),
                 )
             except HTTPStatusError as e:
@@ -153,6 +159,11 @@ class GetPrivilegeSiteSelector(discord.ui.View):
                     f"{interaction.user.mention} 権限の昇格に失敗しました\n"
                     f"> エラーコード: {e.response.status_code}\n"
                     f"> エラーメッセージ: {e.response.text}",
+                )
+                return
+            except Exception as e:
+                await interaction.followup.send(
+                    f"{interaction.user.mention} 権限の昇格に失敗しました: {e}",
                 )
                 return
 
@@ -164,12 +175,12 @@ class GetPrivilegeSiteSelector(discord.ui.View):
                 )
                 privilege_remove_queue = PrivilegeRemoveQueue(
                     dc_user_id=interaction.user.id,
-                    wd_user_id=target_wd_account.id,
-                    wd_site_id=selected_site_id,
+                    wd_user_id=wikidot_user_id,
+                    wd_site_unix_name=selected_site_unix_name,
                     notify_guild_id=notify_msg.guild.id,
                     notify_channel_id=notify_msg.channel.id,
                     notify_message_id=notify_msg.id,
-                    permission_level=action.removeprefix("to_").lower(),
+                    permission_level=permission_level,
                     expired_at=datetime.datetime.now() + datetime.timedelta(hours=1),
                 )
                 session.add(privilege_remove_queue)
@@ -187,7 +198,7 @@ class PrivilegeRemoveButton(discord.ui.View):
         label="権限を削除する",
         custom_id="remove_privilege_button",
         style=discord.ButtonStyle.success,
-        emoji="✅",
+        emoji="",
     )
     async def remove_privilege_button(
         self, button: discord.ui.Button, interaction: discord.Interaction
@@ -196,11 +207,11 @@ class PrivilegeRemoveButton(discord.ui.View):
         await interaction.response.defer()
 
         # client
-        settings = get_settings()
-        c_manage = MemberManagementAPIClient(
-            settings.MEMBER_MANAGEMENT_API_URL,
-            settings.MEMBER_MANAGEMENT_API_KEY,
-        )
+        panopticon = _get_panopticon_client()
+        if panopticon is None:
+            return await interaction.followup.send(
+                "APIが設定されていません", ephemeral=True
+            )
 
         # get queue
         with db_session() as session:
@@ -220,18 +231,20 @@ class PrivilegeRemoveButton(discord.ui.View):
                 )
                 return
 
-            # 削除
-            settings = get_settings()
-            c_manage = MemberManagementAPIClient(
-                settings.MEMBER_MANAGEMENT_API_URL,
-                settings.MEMBER_MANAGEMENT_API_KEY,
-            )
-            await c_manage.change_site_member_privilege(
-                site_id=queue.wd_site_id,
-                user_id=queue.wd_user_id,
-                action="remove_" + queue.permission_level,
-            )
-            # 削除
+            # 権限剥奪
+            try:
+                await panopticon.change_privilege(
+                    site_unix_name=queue.wd_site_unix_name,
+                    user_id=queue.wd_user_id,
+                    action="revoke",
+                )
+            except Exception as e:
+                await interaction.followup.send(
+                    f"権限の削除に失敗しました: {e}", ephemeral=True
+                )
+                return
+
+            # キューから削除
             session.delete(queue)
             session.commit()
 
