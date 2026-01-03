@@ -1,19 +1,14 @@
 import logging
+from typing import Optional
 
 import discord
 from discord.ext import commands, tasks
-from httpx import HTTPStatusError
-from scp_jp.api import LinkerAPIClient
-from scp_jp.api.member_management import (
-    MemberManagementAPIClient,
-    BatchStatusesResponseSchema,
-    Status,
-)
 
 from core import get_settings
 from db import db_session
 from db.models import SiteApplicationNotifyChannel, SiteApplication
 from ui.views import member_management as views
+from utils.panopticon_client import PanopticonClient
 
 
 class MemberManagement(commands.Cog):
@@ -22,15 +17,14 @@ class MemberManagement(commands.Cog):
         self.settings = get_settings()
         self.logger = logging.getLogger("discord")
 
-        # API Client
-        self.linker_api = LinkerAPIClient(
-            self.settings.LINKER_API_URL,
-            self.settings.LINKER_API_KEY,
-        )
-        self.member_api = MemberManagementAPIClient(
-            self.settings.MEMBER_MANAGEMENT_API_URL,
-            self.settings.MEMBER_MANAGEMENT_API_KEY,
-        )
+        # Panopticon API Client
+        if self.settings.PANOPTICON_API_URL and self.settings.PANOPTICON_API_KEY:
+            self.panopticon = PanopticonClient(
+                self.settings.PANOPTICON_API_URL,
+                self.settings.PANOPTICON_API_KEY,
+            )
+        else:
+            self.panopticon: Optional[PanopticonClient] = None
 
     # ==============================
     # イベントハンドラ
@@ -55,42 +49,6 @@ class MemberManagement(commands.Cog):
     group_management = discord.SlashCommandGroup("member", "メンバー管理関連のコマンド")
 
     # ==============================
-    # バッチ処理の管理（systemエンドポイント系）
-    # ==============================
-
-    group_system = group_management.create_subgroup("system", "システム系のコマンド")
-
-    @group_system.command(
-        name="batch_status", description="バッチ処理のステータスを確認します"
-    )
-    @commands.is_owner()
-    async def batch_status(self, ctx: discord.ApplicationContext):
-        await ctx.response.defer(ephemeral=True)
-        result: BatchStatusesResponseSchema = await self.member_api.get_batch_status()
-        msg = "\n".join(
-            f"{status.name}: {status.next_run_time.strftime('%Y-%m-%d %H:%M:%S')}"
-            for status in result.statuses
-        )
-        await ctx.followup.send(msg)
-
-    @group_system.command(name="run_batch", description="バッチ処理を強制実行します")
-    @commands.is_owner()
-    async def run_batch(
-        self, ctx: discord.ApplicationContext, batch_name: discord.Option(str, "処理名")
-    ):
-        await ctx.response.defer(ephemeral=True)
-        try:
-            await self.member_api.force_start_batch(batch_name)
-        except HTTPStatusError as e:
-            if e.response.status_code == 404:
-                await ctx.respond(":x: バッチ処理が見つかりません")
-                return
-            raise
-        await ctx.followup.send(
-            f":white_check_mark: バッチ処理 {batch_name} の強制実行リクエストを送信しました"
-        )
-
-    # ==============================
     # 参加申請管理系
     # ==============================
 
@@ -101,8 +59,17 @@ class MemberManagement(commands.Cog):
     # ===== 通知先チャンネルの設定 =====
 
     async def _autocomplete_sites(self, ctx: discord.AutocompleteContext):
-        sites = await self.member_api.get_sites()
-        return [f"{site.id}: {site.name}" for site in sites if ctx.value in site.name]
+        if self.panopticon is None:
+            return []
+        try:
+            sites = await self.panopticon.get_sites()
+            return [
+                f"{site.unixName}: {site.name}"
+                for site in sites
+                if ctx.value in site.name or ctx.value in site.unixName
+            ]
+        except Exception:
+            return []
 
     @group_application.command(
         name="add_notify_channel",
@@ -116,6 +83,10 @@ class MemberManagement(commands.Cog):
     ):
         await ctx.response.defer(ephemeral=True)
 
+        if self.panopticon is None:
+            await ctx.followup.send(":x: APIが設定されていません", ephemeral=True)
+            return
+
         # ctx.guildまたはctx.channelがない場合はエラー
         if ctx.guild is None or ctx.channel is None:
             await ctx.followup.send(
@@ -123,11 +94,11 @@ class MemberManagement(commands.Cog):
             )
             return
 
-        site_id = int(site.split(":")[0])
+        site_unix_name = site.split(":")[0]
 
         # サイト存在チェック
-        srv_sites = await self.member_api.get_sites()
-        if site_id not in [_s.id for _s in srv_sites]:
+        srv_sites = await self.panopticon.get_sites()
+        if site_unix_name not in [_s.unixName for _s in srv_sites]:
             await ctx.followup.send(":x: サイトが見つかりません", ephemeral=True)
             return
 
@@ -138,7 +109,7 @@ class MemberManagement(commands.Cog):
                 .filter_by(
                     guild_id=ctx.guild.id,
                     channel_id=ctx.channel.id,
-                    site_id=site_id,
+                    site_unix_name=site_unix_name,
                 )
                 .first()
             )
@@ -149,7 +120,7 @@ class MemberManagement(commands.Cog):
                     SiteApplicationNotifyChannel(
                         guild_id=ctx.guild.id,
                         channel_id=ctx.channel.id,
-                        site_id=site_id,
+                        site_unix_name=site_unix_name,
                     )
                 )
                 session.commit()
@@ -175,7 +146,13 @@ class MemberManagement(commands.Cog):
     async def list_notify_channels(self, ctx: discord.ApplicationContext):
         await ctx.response.defer(ephemeral=True)
 
-        srv_sites = {site.id: site for site in await self.member_api.get_sites()}
+        if self.panopticon is None:
+            await ctx.followup.send(":x: APIが設定されていません", ephemeral=True)
+            return
+
+        srv_sites = {
+            site.unixName: site for site in await self.panopticon.get_sites()
+        }
 
         with db_session() as session:
             channels = (
@@ -185,11 +162,11 @@ class MemberManagement(commands.Cog):
             )
             msg = "\n".join(
                 [
-                    f"{ctx.guild.get_channel(channel.channel_id).mention} : {srv_sites[channel.site_id].name}"
+                    f"{ctx.guild.get_channel(channel.channel_id).mention} : {srv_sites.get(channel.site_unix_name, channel.site_unix_name)}"
                     for channel in channels
                 ]
             )
-            await ctx.followup.send(msg, ephemeral=True)
+            await ctx.followup.send(msg or "通知先チャンネルは登録されていません", ephemeral=True)
 
     # ===== 参加申請の処理系 =====
     @tasks.loop(minutes=10)
@@ -197,13 +174,21 @@ class MemberManagement(commands.Cog):
         """
         参加申請を監視し、新しい申請があれば通知します
         """
+        if self.panopticon is None:
+            return
+
         with db_session() as session:
             channels = session.query(SiteApplicationNotifyChannel).all()
             for channel in channels:
-                site_id = channel.site_id
-                pending_applications = await self.member_api.get_application_requests(
-                    site_id=site_id, statuses=[Status.PENDING]
-                )
+                site_unix_name = channel.site_unix_name
+                try:
+                    # status=0 は PENDING
+                    pending_applications, _ = await self.panopticon.get_applications(
+                        site_unix_name=site_unix_name, status=0
+                    )
+                except Exception as e:
+                    self.logger.error(f"Failed to get applications: {e}")
+                    continue
 
                 for pending in pending_applications:
                     # original_idで検索
@@ -211,42 +196,35 @@ class MemberManagement(commands.Cog):
                         session.query(SiteApplication)
                         .filter_by(
                             original_id=pending.id,
-                            site_id=site_id,
+                            site_unix_name=site_unix_name,
                         )
                         .first()
                     )
                     if exist_entry is None:
                         # メッセージ送信
                         guild_obj = self.bot.get_guild(channel.guild_id)
+                        if guild_obj is None:
+                            continue
                         channel_obj = guild_obj.get_channel(channel.channel_id)
+                        if channel_obj is None:
+                            continue
+
                         application_text = pending.text
-                        if (
-                            application_text is not None
-                            and pending.password is not None
-                        ):
-                            application_text.replace(
-                                pending.password, f"**`{pending.password}`**"
-                            )
 
                         await channel_obj.send(
-                            f"### 【{pending.site['name']}】参加申請を受け取りました",
+                            f"### 【{site_unix_name}】参加申請を受け取りました",
                             embed=discord.Embed(
                                 title="参加申請", color=discord.Color.yellow()
                             )
                             .set_author(
-                                name=pending.user["name"],
-                                url=f"https://www.wikidot.com/user:info/{pending.user['unix_name']}",
-                                icon_url=pending.user["avatar_url"],
+                                name=pending.user.name,
+                                url=f"https://www.wikidot.com/user:info/{pending.user.unixName}",
+                                icon_url=pending.user.avatarUrl or "",
                             )
                             .set_footer(text=f"{pending.id}")
                             .add_field(
                                 name="メッセージ",
                                 value=application_text or "（メッセージなし）",
-                                inline=False,
-                            )
-                            .add_field(
-                                name="合言葉",
-                                value=pending.password or "（不明）",
                                 inline=False,
                             ),
                             view=views.ApplicationActionButtons(),
@@ -256,7 +234,7 @@ class MemberManagement(commands.Cog):
                         session.add(
                             SiteApplication(
                                 original_id=pending.id,
-                                site_id=site_id,
+                                site_unix_name=site_unix_name,
                             )
                         )
                         session.commit()
