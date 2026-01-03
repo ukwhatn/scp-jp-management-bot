@@ -13,7 +13,7 @@ class PrivilegeRemoveQueue(BaseModel):
     dc_user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
 
     # wikidot
-    wd_site_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    wd_site_unix_name: Mapped[str] = mapped_column(String(100), nullable=False)
     wd_user_id: Mapped[int] = mapped_column(Integer, nullable=False)
 
     # notify_guild_id
