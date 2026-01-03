@@ -52,13 +52,9 @@ class Settings(BaseSettings):
     SENTRY_DSN: Optional[str] = None
     SENTRY_TRACES_SAMPLE_RATE: float = 1.0
 
-    # Linker
-    LINKER_API_URL: Optional[str] = None
-    LINKER_API_KEY: Optional[str] = None
-
-    # Member Management
-    MEMBER_MANAGEMENT_API_URL: Optional[str] = None
-    MEMBER_MANAGEMENT_API_KEY: Optional[str] = None
+    # Panopticon
+    PANOPTICON_API_URL: Optional[str] = None
+    PANOPTICON_API_KEY: Optional[str] = None
 
     @classmethod
     @field_validator("SENTRY_DSN")
