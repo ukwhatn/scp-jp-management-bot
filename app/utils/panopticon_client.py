@@ -126,7 +126,10 @@ class PanopticonClient:
         if self._client is None:
             self._client = httpx.AsyncClient(
                 base_url=self.base_url,
-                headers={"Authorization": f"Bearer {self.api_key}"},
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Origin": self.base_url,  # CSRF対策のためOriginヘッダーを追加
+                },
                 timeout=30.0,
             )
         return self._client
