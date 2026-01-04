@@ -1,23 +1,34 @@
+from typing import Optional
+
 import discord
 from httpx import HTTPStatusError
-from scp_jp.api import MemberManagementAPIClient, LinkerAPIClient
-from scp_jp.api.member_management import PermissionLevel, DeclineReasonType
 
 from core import get_settings
 from db import db_session
 from db.models import SiteApplication
+from utils.panopticon_client import PanopticonClient
 from utils.temporary_memory import TemporaryMemory
 
 # インメモリキャッシュのインスタンス
 temp_memory = TemporaryMemory()
 
 
+def _get_panopticon_client() -> Optional[PanopticonClient]:
+    settings = get_settings()
+    if settings.PANOPTICON_API_URL and settings.PANOPTICON_API_KEY:
+        return PanopticonClient(
+            settings.PANOPTICON_API_URL,
+            settings.PANOPTICON_API_KEY,
+        )
+    return None
+
+
 async def _handle_request(
     interaction: discord.Interaction,
     accept: bool,
-    decline_reason_type: DeclineReasonType | None = None,
-    decline_reason: str | None = None,
-    original_message_id: int | None = None,
+    decline_reason_type: Optional[int] = None,
+    decline_reason: Optional[str] = None,
+    original_message_id: Optional[int] = None,
 ):
     await interaction.response.defer(invisible=True)
 
@@ -29,16 +40,12 @@ async def _handle_request(
         else original_message_id,
     )
 
-    # LinkerAPIとMemberManagementAPIのクライアントを初期化
-    settings = get_settings()
-    client_l = LinkerAPIClient(
-        base_url=settings.LINKER_API_URL,
-        api_key=settings.LINKER_API_KEY,
-    )
-    client_m = MemberManagementAPIClient(
-        base_url=settings.MEMBER_MANAGEMENT_API_URL,
-        api_key=settings.MEMBER_MANAGEMENT_API_KEY,
-    )
+    # Panopticon APIクライアントを初期化
+    panopticon = _get_panopticon_client()
+    if panopticon is None:
+        return await interaction.followup.send(
+            "APIが設定されていません。", ephemeral=True
+        )
 
     # 処理開始
     with db_session() as session:
@@ -51,7 +58,7 @@ async def _handle_request(
 
         application_id = int(original_message.embeds[0].footer.text)
 
-        db_application: SiteApplication | None = (
+        db_application: Optional[SiteApplication] = (
             session.query(SiteApplication)
             .filter(SiteApplication.original_id == application_id)
             .first()
@@ -62,45 +69,58 @@ async def _handle_request(
                 "対象の参加申請が見つかりませんでした。", ephemeral=True
             )
 
-        # ボタン押下者のWikidotユーザ情報をLinkerから取得 -> reviewer_id取得
-        linker_data = (await client_l.account_list([interaction.user.id])).result
+        site_unix_name = db_application.site_unix_name
 
-        if str(interaction.user.id) not in linker_data:
+        # ボタン押下者のWikidotユーザ情報をPanopticonから取得
+        try:
+            bulk_result = await panopticon.link_bulk([str(interaction.user.id)])
+        except Exception as e:
             return await interaction.followup.send(
-                "Linkerに登録してください。", ephemeral=True
+                f"連携情報の取得に失敗しました: {e}", ephemeral=True
             )
 
-        wikidot_users = linker_data[str(interaction.user.id)].wikidot
-
-        reviewer = None
-        for wikidot_user in wikidot_users:
-            # WikidotユーザがADMINパーミッションを持っているか確認する
-            _check = await client_m.check_site_member_permission(
-                db_application.site_id, wikidot_user.id, PermissionLevel.ADMIN
-            )
-            if _check:
-                reviewer = wikidot_user
-                break
-
-        if not reviewer:
+        if (
+            not bulk_result
+            or not bulk_result[0].linked
+            or bulk_result[0].account is None
+        ):
             return await interaction.followup.send(
-                "ADMINパーミッションを持っているWikidotユーザが見つかりませんでした。",
+                "アカウント連携を完了してください。", ephemeral=True
+            )
+
+        wikidot_user_id = bulk_result[0].account.user.id
+        wikidot_username = bulk_result[0].account.user.name
+
+        # WikidotユーザがADMINパーミッションを持っているか確認する
+        try:
+            user_info = await panopticon.get_user(wikidot_user_id)
+            has_admin = panopticon.has_admin_permission(
+                user_info.permissions, site_unix_name
+            )
+        except Exception as e:
+            return await interaction.followup.send(
+                f"権限確認に失敗しました: {e}", ephemeral=True
+            )
+
+        if not has_admin:
+            return await interaction.followup.send(
+                "対象サイトのADMINパーミッションを持っていません。",
                 ephemeral=True,
             )
 
         # 処理開始
         try:
             if accept:
-                await client_m.approve_application_request(
-                    request_id=application_id,
-                    reviewer_id=reviewer.id,
+                await panopticon.approve_application(
+                    site_unix_name=site_unix_name,
+                    app_id=application_id,
                 )
             else:
-                await client_m.decline_application_request(
-                    request_id=application_id,
-                    reviewer_id=reviewer.id,
-                    decline_reason_type=decline_reason_type,
-                    decline_reason_detail=decline_reason,
+                await panopticon.decline_application(
+                    site_unix_name=site_unix_name,
+                    app_id=application_id,
+                    reason_type=decline_reason_type or 9,  # 9 = その他
+                    reason_detail=decline_reason,
                 )
 
             # 処理完了後:
@@ -123,20 +143,25 @@ async def _handle_request(
                 )
                 .add_field(
                     name="処理者",
-                    value=f"{interaction.user.mention} (as {reviewer.username})",
+                    value=f"{interaction.user.mention} (as {wikidot_username})",
                     inline=False,
                 )
             )
 
             if not accept:
-                reason_types_ja = await client_m.get_decline_reason_types()
+                # 却下理由タイプの名前を取得
+                reason_types = await panopticon.get_decline_reason_types()
+                reason_type_name = next(
+                    (rt.name for rt in reason_types if rt.id == decline_reason_type),
+                    "不明",
+                )
                 new_embed.add_field(
                     name="却下理由",
-                    value=reason_types_ja[str(decline_reason_type.value)],
+                    value=reason_type_name,
                     inline=False,
                 )
                 new_embed.add_field(
-                    name="却下理由詳細", value=decline_reason, inline=True
+                    name="却下理由詳細", value=decline_reason or "なし", inline=True
                 )
 
             await interaction.followup.edit_message(
@@ -148,6 +173,10 @@ async def _handle_request(
         except HTTPStatusError as e:
             await interaction.followup.send(
                 f"エラーが発生しました: {e.response.text}", ephemeral=True
+            )
+        except Exception as e:
+            await interaction.followup.send(
+                f"エラーが発生しました: {e}", ephemeral=True
             )
 
 
@@ -174,12 +203,23 @@ class ApplicationActionButtons(discord.ui.View):
     async def decline(self, _: discord.ui.Button, interaction: discord.Interaction):
         await interaction.response.defer()
         # DeclineReasonTypeSelectorに変更
-        reason_types = await MemberManagementAPIClient(
-            base_url=get_settings().MEMBER_MANAGEMENT_API_URL,
-            api_key=get_settings().MEMBER_MANAGEMENT_API_KEY,
-        ).get_decline_reason_types()
+        panopticon = _get_panopticon_client()
+        if panopticon is None:
+            return await interaction.followup.send(
+                "APIが設定されていません。", ephemeral=True
+            )
+
+        try:
+            reason_types = await panopticon.get_decline_reason_types()
+            # dict形式に変換（id -> name）
+            reason_types_dict = {str(rt.id): rt.name for rt in reason_types}
+        except Exception as e:
+            return await interaction.followup.send(
+                f"却下理由の取得に失敗しました: {e}", ephemeral=True
+            )
+
         await interaction.followup.edit_message(
-            view=DeclineReasonTypeSelector(reason_types),
+            view=DeclineReasonTypeSelector(reason_types_dict),
             message_id=interaction.message.id,
         )
 
@@ -231,7 +271,7 @@ class ApplicationDeclineReasonInputModal(discord.ui.Modal):
         await _handle_request(
             interaction,
             accept=False,
-            decline_reason_type=DeclineReasonType(int(decline_reason_type)),
+            decline_reason_type=int(decline_reason_type),
             decline_reason=decline_reason,
             original_message_id=original_message_id,
         )

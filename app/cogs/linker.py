@@ -1,9 +1,10 @@
 import logging
+from dataclasses import dataclass
+from typing import Optional
 
 import discord
 from discord.commands import slash_command
 from discord.ext import commands, tasks
-from scp_jp.api.linker import LinkerAPIClient
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -11,55 +12,140 @@ from core import get_settings
 from db import db_session
 from db.models import Guild, RegisteredRole, NickUpdateTargetGuild
 from utils import DiscordUtil
+from utils.panopticon_client import PanopticonClient
+
+
+@dataclass
+class WikidotAccountInfo:
+    """Wikidotアカウント情報（旧APIとの互換性のため）"""
+
+    id: int
+    username: str
+    unixname: str
+    is_jp_member: bool
+
+
+@dataclass
+class LinkedAccountInfo:
+    """連携アカウント情報（旧APIとの互換性のため）"""
+
+    discord_id: str
+    wikidot: list[WikidotAccountInfo]
 
 
 class LinkerUtility:
     def __init__(self):
         settings = get_settings()
-        self.linker_api_url = settings.LINKER_API_URL
-        self.linker_api_key = settings.LINKER_API_KEY
+        self.panopticon_url = settings.PANOPTICON_API_URL
+        self.panopticon_key = settings.PANOPTICON_API_KEY
 
         self.logger = logging.getLogger("LinkerUtility")
 
-        self.linker_client = LinkerAPIClient(self.linker_api_url, self.linker_api_key)
+        if self.panopticon_url and self.panopticon_key:
+            self.client = PanopticonClient(self.panopticon_url, self.panopticon_key)
+        else:
+            self.client = None
 
-    async def start_flow(self, user: discord.User | discord.Member):
-        resp = await self.linker_client.flow_start(
-            discord_id=str(user.id),
-            discord_username=user.name,
-            discord_avatar=user.display_avatar.url
-            if user.display_avatar
-            else "https://cdn.discordapp.com/embed/avatars/0.png",
-        )
-
-        if resp is None:
+    async def start_flow(self, user: discord.User | discord.Member) -> Optional[str]:
+        if self.client is None:
             return None
 
-        return resp.url
-
-    async def recheck_flow(self, user: discord.User | discord.Member):
-        resp = await self.linker_client.flow_recheck(
-            discord_id=str(user.id),
-            discord_username=user.name,
-            discord_avatar=user.display_avatar.url
-            if user.display_avatar
-            else "https://cdn.discordapp.com/embed/avatars/0.png",
-        )
-
-        if resp is None:
+        try:
+            resp = await self.client.link_start(
+                discord_id=str(user.id),
+                username=user.name,
+                avatar=user.display_avatar.url
+                if user.display_avatar
+                else "https://cdn.discordapp.com/embed/avatars/0.png",
+            )
+            return resp.link_url
+        except Exception as e:
+            self.logger.error(f"link_start error: {e}")
             return None
 
-        return resp
-
-    async def list_accounts(self, users: list[discord.User | discord.Member]):
-        resp = await self.linker_client.account_list(
-            discord_ids=[str(user.id) for user in users]
-        )
-
-        if resp is None:
+    async def recheck_flow(
+        self, user: discord.User | discord.Member
+    ) -> Optional[LinkedAccountInfo]:
+        if self.client is None:
             return None
 
-        return resp.result
+        try:
+            resp = await self.client.link_recheck(
+                discord_id=str(user.id),
+                username=user.name,
+                avatar=user.display_avatar.url
+                if user.display_avatar
+                else "https://cdn.discordapp.com/embed/avatars/0.png",
+            )
+
+            if not resp.linked or resp.user is None:
+                return LinkedAccountInfo(discord_id=str(user.id), wikidot=[])
+
+            # panopticon APIは1 Discord = 1 Wikidotアカウント
+            wikidot_info = WikidotAccountInfo(
+                id=resp.user.id,
+                username=resp.user.name,
+                unixname=resp.user.unix_name,
+                is_jp_member=resp.jp_member,
+            )
+            return LinkedAccountInfo(discord_id=str(user.id), wikidot=[wikidot_info])
+        except Exception as e:
+            self.logger.error(f"link_recheck error: {e}")
+            return None
+
+    async def list_accounts(
+        self, users: list[discord.User | discord.Member]
+    ) -> Optional[dict[str, LinkedAccountInfo]]:
+        if self.client is None:
+            return None
+
+        try:
+            discord_ids = [str(user.id) for user in users]
+            bulk_resp = await self.client.link_bulk(discord_ids)
+
+            result: dict[str, LinkedAccountInfo] = {}
+            for account_info in bulk_resp:
+                discord_id = account_info.discord_id
+
+                if not account_info.linked or account_info.account is None:
+                    result[discord_id] = LinkedAccountInfo(
+                        discord_id=discord_id, wikidot=[]
+                    )
+                    continue
+
+                # jp_memberはbulk APIに含まれないため、site-membershipsから取得
+                user_id = account_info.account.user.id
+                is_jp_member = await self._check_jp_member(user_id)
+
+                wikidot_info = WikidotAccountInfo(
+                    id=user_id,
+                    username=account_info.account.user.name,
+                    unixname=account_info.account.user.unix_name,
+                    is_jp_member=is_jp_member,
+                )
+                result[discord_id] = LinkedAccountInfo(
+                    discord_id=discord_id, wikidot=[wikidot_info]
+                )
+
+            return result
+        except Exception as e:
+            self.logger.error(f"list_accounts error: {e}")
+            return None
+
+    async def _check_jp_member(self, user_id: int) -> bool:
+        """ユーザーがscp-jpのアクティブメンバーかどうか確認"""
+        if self.client is None:
+            return False
+
+        try:
+            memberships = await self.client.get_user_site_memberships(user_id)
+            return any(
+                m.site is not None and m.site.unixName == "scp-jp" and not m.isResigned
+                for m in memberships
+            )
+        except Exception as e:
+            self.logger.error(f"_check_jp_member error: {e}")
+            return False
 
 
 class StartFlowView(discord.ui.View):
@@ -406,8 +492,8 @@ class Linker(commands.Cog):
             nick_update_target = []
 
             for data in resp.values():
-                # discord.idを取得
-                _d_id = int(data.discord.id)
+                # discord_idを取得
+                _d_id = int(data.discord_id)
 
                 # wikidotアカウントが存在しない場合
                 if len(data.wikidot) == 0:
