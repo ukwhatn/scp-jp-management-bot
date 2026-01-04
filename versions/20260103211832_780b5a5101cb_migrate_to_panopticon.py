@@ -25,10 +25,13 @@ branch_labels = None
 depends_on = None
 
 # site_id to unix_name mapping
-# 運用時に確認して設定してください
 SITE_MAPPING = {
-    # 例: 696969: "scp-jp",
-    # 例: 1234567: "scp-jp-sandbox3",
+    578002: "scp-jp",
+    591812: "scpsandbox-jp",
+    852966: "scp-jp-sandbox2",
+    1422068: "05command-ja",
+    1971800: "scp-jp-sandbox3",
+    4548695: "scp-jp-storage",
 }
 
 
