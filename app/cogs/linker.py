@@ -99,6 +99,10 @@ class LinkerUtility:
         if self.client is None:
             return None
 
+        # 空リストの場合は早期リターン
+        if not users:
+            return {}
+
         try:
             discord_ids = [str(user.id) for user in users]
             bulk_resp = await self.client.link_bulk(discord_ids)
@@ -477,9 +481,10 @@ class Linker(commands.Cog):
 
             # linker APIでリストを取得
             linker_util = LinkerUtility()
-            resp = await linker_util.list_accounts(
-                [guild.get_member(member_id) for member_id in member_ids]
-            )
+            members_list = [guild.get_member(member_id) for member_id in member_ids]
+            # Noneを除外（get_memberがNoneを返す可能性があるため）
+            members_list = [m for m in members_list if m is not None]
+            resp = await linker_util.list_accounts(members_list)
 
             if resp is None:
                 return
