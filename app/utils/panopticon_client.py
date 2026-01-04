@@ -81,6 +81,7 @@ class Application(BaseModel):
     reviewedById: Optional[int] = None
     user: ApplicationUser
     reviewer: Optional[ApplicationUser] = None
+    correctPassword: Optional[str] = None
 
 
 class Pagination(BaseModel):

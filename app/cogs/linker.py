@@ -54,6 +54,7 @@ class LinkerUtility:
             resp = await self.client.link_start(
                 discord_id=str(user.id),
                 username=user.name,
+                discriminator=user.discriminator,
                 avatar=user.display_avatar.url
                 if user.display_avatar
                 else "https://cdn.discordapp.com/embed/avatars/0.png",
@@ -73,6 +74,7 @@ class LinkerUtility:
             resp = await self.client.link_recheck(
                 discord_id=str(user.id),
                 username=user.name,
+                discriminator=user.discriminator,
                 avatar=user.display_avatar.url
                 if user.display_avatar
                 else "https://cdn.discordapp.com/embed/avatars/0.png",

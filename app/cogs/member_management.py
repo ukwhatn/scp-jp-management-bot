@@ -209,24 +209,39 @@ class MemberManagement(commands.Cog):
                         if channel_obj is None:
                             continue
 
-                        application_text = pending.text
+                        application_text = pending.text or ""
+                        correct_password = pending.correctPassword
+
+                        # 正しい合言葉が含まれていたら太字にする
+                        display_text = application_text
+                        if correct_password and correct_password in application_text:
+                            display_text = application_text.replace(
+                                correct_password, f"**{correct_password}**"
+                            )
+
+                        embed = discord.Embed(
+                            title="参加申請", color=discord.Color.yellow()
+                        )
+                        embed.set_author(
+                            name=pending.user.name,
+                            url=f"https://www.wikidot.com/user:info/{pending.user.unixName}",
+                            icon_url=pending.user.avatarUrl or "",
+                        )
+                        embed.set_footer(text=f"{pending.id}")
+                        embed.add_field(
+                            name="メッセージ",
+                            value=display_text or "（メッセージなし）",
+                            inline=False,
+                        )
+                        embed.add_field(
+                            name="正しい合言葉",
+                            value=f"`{correct_password}`" if correct_password else "（未設定）",
+                            inline=False,
+                        )
 
                         await channel_obj.send(
                             f"### 【{site_unix_name}】参加申請を受け取りました",
-                            embed=discord.Embed(
-                                title="参加申請", color=discord.Color.yellow()
-                            )
-                            .set_author(
-                                name=pending.user.name,
-                                url=f"https://www.wikidot.com/user:info/{pending.user.unixName}",
-                                icon_url=pending.user.avatarUrl or "",
-                            )
-                            .set_footer(text=f"{pending.id}")
-                            .add_field(
-                                name="メッセージ",
-                                value=application_text or "（メッセージなし）",
-                                inline=False,
-                            ),
+                            embed=embed,
                             view=views.ApplicationActionButtons(),
                         )
 
