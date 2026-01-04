@@ -209,8 +209,15 @@ class MemberManagement(commands.Cog):
                         if channel_obj is None:
                             continue
 
-                        application_text = pending.text
+                        application_text = pending.text or ""
                         correct_password = pending.correctPassword
+
+                        # 正しい合言葉が含まれていたら太字にする
+                        display_text = application_text
+                        if correct_password and correct_password in application_text:
+                            display_text = application_text.replace(
+                                correct_password, f"**{correct_password}**"
+                            )
 
                         embed = discord.Embed(
                             title="参加申請", color=discord.Color.yellow()
@@ -223,7 +230,7 @@ class MemberManagement(commands.Cog):
                         embed.set_footer(text=f"{pending.id}")
                         embed.add_field(
                             name="メッセージ",
-                            value=application_text or "（メッセージなし）",
+                            value=display_text or "（メッセージなし）",
                             inline=False,
                         )
                         embed.add_field(
