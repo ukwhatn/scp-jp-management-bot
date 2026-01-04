@@ -1,5 +1,6 @@
 """Panopticon APIクライアント"""
 
+import logging
 from typing import Optional
 
 import httpx
@@ -120,6 +121,7 @@ class PanopticonClient:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self._client: Optional[httpx.AsyncClient] = None
+        self.logger = logging.getLogger("PanopticonClient")
 
     @property
     def client(self) -> httpx.AsyncClient:
@@ -158,6 +160,8 @@ class PanopticonClient:
                 "avatar": avatar,
             },
         )
+        if not resp.is_success:
+            self.logger.error(f"link_start API error {resp.status_code}: {resp.text}")
         resp.raise_for_status()
         return LinkStartResponse(**resp.json()["data"])
 
@@ -178,6 +182,8 @@ class PanopticonClient:
                 "avatar": avatar,
             },
         )
+        if not resp.is_success:
+            self.logger.error(f"link_recheck API error {resp.status_code}: {resp.text}")
         resp.raise_for_status()
         return LinkRecheckResponse(**resp.json()["data"])
 
@@ -189,6 +195,8 @@ class PanopticonClient:
                 "discord_ids": discord_ids,
             },
         )
+        if not resp.is_success:
+            self.logger.error(f"link_bulk API error {resp.status_code}: {resp.text}")
         resp.raise_for_status()
         return [BulkAccountInfo(**a) for a in resp.json()["data"]["accounts"]]
 

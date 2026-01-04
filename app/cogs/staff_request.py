@@ -90,11 +90,29 @@ class StaffRequest(commands.Cog):
                 if len(sr.pending_users) == 0:
                     continue
 
-                author = self.bot.get_user(sr.created_by_id)
                 original_guild = self.bot.get_guild(sr.summary_message_guild_id)
+                if original_guild is None:
+                    self.logger.warning(
+                        f"[Staff Request] Guild {sr.summary_message_guild_id} not found"
+                    )
+                    continue
+
                 original_channel = original_guild.get_channel(
                     sr.summary_message_channel_id
                 )
+                if original_channel is None:
+                    self.logger.warning(
+                        f"[Staff Request] Channel {sr.summary_message_channel_id} not found"
+                    )
+                    continue
+
+                author = self.bot.get_user(sr.created_by_id)
+                if author is None:
+                    self.logger.warning(
+                        f"[Staff Request] User {sr.created_by_id} not found"
+                    )
+                    continue
+
                 original_message = await original_channel.fetch_message(
                     sr.summary_message_id
                 )
