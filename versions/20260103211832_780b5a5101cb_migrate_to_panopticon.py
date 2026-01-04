@@ -38,8 +38,9 @@ SITE_MAPPING = {
 def upgrade():
     # === site_application_notify_channels ===
     # 1. 旧unique制約を削除
+    # PostgreSQLは63文字制限があるため、テーブル名部分が切り詰められている
     op.drop_constraint(
-        "site_application_notify_channels_site_id_guild_id_channel_id_key",
+        "site_application_notify_channel_site_id_guild_id_channel_id_key",
         "site_application_notify_channels",
         type_="unique",
     )
@@ -70,7 +71,7 @@ def upgrade():
 
     # 6. 新unique制約を追加
     op.create_unique_constraint(
-        "site_application_notify_channels_site_unix_name_guild_id_channel_id_key",
+        "site_app_notify_channels_unix_name_guild_channel_key",
         "site_application_notify_channels",
         ["site_unix_name", "guild_id", "channel_id"],
     )
@@ -143,7 +144,7 @@ def downgrade():
 
     # === site_application_notify_channels ===
     op.drop_constraint(
-        "site_application_notify_channels_site_unix_name_guild_id_channel_id_key",
+        "site_app_notify_channels_unix_name_guild_channel_key",
         "site_application_notify_channels",
         type_="unique",
     )
@@ -153,7 +154,7 @@ def downgrade():
     )
     op.drop_column("site_application_notify_channels", "site_unix_name")
     op.create_unique_constraint(
-        "site_application_notify_channels_site_id_guild_id_channel_id_key",
+        "site_application_notify_channel_site_id_guild_id_channel_id_key",
         "site_application_notify_channels",
         ["site_id", "guild_id", "channel_id"],
     )
