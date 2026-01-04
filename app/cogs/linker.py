@@ -117,12 +117,14 @@ class LinkerUtility:
                     )
                     continue
 
-                # jp_memberはbulk APIに含まれないため、site-membershipsから取得
-                user_id = account_info.account.user.id
-                is_jp_member = await self._check_jp_member(user_id)
+                # site_membershipsからJPメンバー判定
+                is_jp_member = any(
+                    m.site_unix_name == "scp-jp" and not m.is_resigned
+                    for m in account_info.account.site_memberships
+                )
 
                 wikidot_info = WikidotAccountInfo(
-                    id=user_id,
+                    id=account_info.account.user.id,
                     username=account_info.account.user.name,
                     unixname=account_info.account.user.unix_name,
                     is_jp_member=is_jp_member,
@@ -135,21 +137,6 @@ class LinkerUtility:
         except Exception as e:
             self.logger.error(f"list_accounts error: {e}")
             return None
-
-    async def _check_jp_member(self, user_id: int) -> bool:
-        """ユーザーがscp-jpのアクティブメンバーかどうか確認"""
-        if self.client is None:
-            return False
-
-        try:
-            memberships = await self.client.get_user_site_memberships(user_id)
-            return any(
-                m.site is not None and m.site.unixName == "scp-jp" and not m.isResigned
-                for m in memberships
-            )
-        except Exception as e:
-            self.logger.error(f"_check_jp_member error: {e}")
-            return False
 
 
 class StartFlowView(discord.ui.View):

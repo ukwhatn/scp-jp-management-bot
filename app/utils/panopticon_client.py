@@ -32,11 +32,21 @@ class LinkRecheckResponse(BaseModel):
     jp_member: bool
 
 
+class BulkSiteMembership(BaseModel):
+    id: int
+    site_id: int
+    site_unix_name: Optional[str] = None
+    site_name: Optional[str] = None
+    joined_at: str
+    is_resigned: bool
+
+
 class LinkedAccount(BaseModel):
     id: int
     user: UserInfo
     discord: DiscordInfo
     created_at: str
+    site_memberships: list[BulkSiteMembership] = []
 
 
 class BulkAccountInfo(BaseModel):
