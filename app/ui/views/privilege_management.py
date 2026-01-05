@@ -28,7 +28,6 @@ class GetPrivilegeButton(discord.ui.View):
         label="Wiki上での権限を取得する",
         custom_id="get_privilege_button",
         style=discord.ButtonStyle.danger,
-        emoji="",
     )
     async def get_privilege_button(
         self, button: discord.ui.Button, interaction: discord.Interaction
@@ -202,7 +201,6 @@ class PrivilegeRemoveButton(discord.ui.View):
         label="権限を削除する",
         custom_id="remove_privilege_button",
         style=discord.ButtonStyle.success,
-        emoji="",
     )
     async def remove_privilege_button(
         self, button: discord.ui.Button, interaction: discord.Interaction
