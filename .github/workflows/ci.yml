@@ -62,7 +62,7 @@ jobs:
           
           # Semgrep scan for critical issues only
           echo "Running critical Semgrep scan..."
-          poetry run semgrep scan --config=p/python --config=p/security-audit --config=p/owasp-top-ten --severity ERROR --error &
+          timeout 120 poetry run semgrep scan --config=p/python --config=p/security-audit --config=p/owasp-top-ten --severity ERROR --error &
           SEMGREP_PID=$!
           
           # Install and run Trivy
