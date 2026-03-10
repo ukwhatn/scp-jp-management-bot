@@ -62,7 +62,7 @@ jobs:
           
           # Install and run Trivy
           echo "Installing Trivy Scanner..."
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.46.1
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.69.3
 
           echo "Scanning Dockerfiles..."
           trivy config --exit-code 1 --severity CRITICAL ./docker/app.Dockerfile &
