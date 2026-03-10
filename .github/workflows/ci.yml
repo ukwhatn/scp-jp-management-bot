@@ -60,11 +60,6 @@ jobs:
           poetry run bandit -r app/ -x tests/,app/db/dump.py -ll &
           BANDIT_PID=$!
           
-          # Semgrep scan for critical issues only
-          echo "Running critical Semgrep scan..."
-          timeout 120 poetry run semgrep scan --config=p/python --config=p/security-audit --config=p/owasp-top-ten --severity ERROR --error > /tmp/semgrep.log 2>&1 &
-          SEMGREP_PID=$!
-
           # Install and run Trivy
           echo "Installing Trivy Scanner..."
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.46.1
@@ -76,16 +71,12 @@ jobs:
           # Wait for all processes to complete, fail if any fail
           wait $LINT_PID || { echo "Linting failed"; exit 1; }
           wait $BANDIT_PID || { echo "Bandit scan failed"; exit 1; }
-          SEMGREP_EXIT=0
-          wait $SEMGREP_PID || SEMGREP_EXIT=$?
-          echo "=== Semgrep output (exit code: $SEMGREP_EXIT) ==="
-          cat /tmp/semgrep.log || true
-          echo "=== End Semgrep output ==="
-          if [ "$SEMGREP_EXIT" -ne 0 ]; then
-            echo "Semgrep scan failed with exit code $SEMGREP_EXIT"
-            exit 1
-          fi
           wait $TRIVY1_PID || { echo "Trivy app.Dockerfile scan failed"; exit 1; }
+
+      - name: Run Semgrep scan
+        run: |
+          echo "Running critical Semgrep scan..."
+          poetry run semgrep scan --config=p/python --config=p/security-audit --config=p/owasp-top-ten --severity ERROR --error
           
           echo "All quality and security checks passed!"
 
