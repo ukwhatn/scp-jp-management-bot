@@ -27,7 +27,7 @@ jobs:
           cache: 'pip'
 
       - name: Cache poetry dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: poetry-cache
         with:
           path: ~/.cache/pypoetry
@@ -54,12 +54,12 @@ jobs:
           echo "Running linting and security checks..."
           make lint &
           LINT_PID=$!
-
+          
           # Bandit scan for critical issues only
           echo "Running critical Bandit scan..."
           poetry run bandit -r app/ -x tests/,app/db/dump.py -ll &
           BANDIT_PID=$!
-
+          
           # Install and run Trivy
           echo "Installing Trivy Scanner..."
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.69.3
@@ -77,7 +77,7 @@ jobs:
         run: |
           echo "Running critical Semgrep scan..."
           poetry run semgrep scan --config=p/python --config=p/security-audit --config=p/owasp-top-ten --severity ERROR --error
-
+          
           echo "All quality and security checks passed!"
 
       # Docker Build and Health Check
