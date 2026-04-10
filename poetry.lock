@@ -2626,20 +2626,20 @@ doc = ["Sphinx", "sphinx-rtd-theme"]
 
 [[package]]
 name = "semgrep"
-version = "1.157.0"
+version = "1.158.0"
 description = "Lightweight static analysis for many languages. Find bug variants with patterns that look like source code."
 optional = false
 python-versions = ">=3.10"
 groups = ["dev"]
 files = [
-    {file = "semgrep-1.157.0-cp310.cp311.cp312.cp313.cp314.py310.py311.py312.py313.py314-none-macosx_10_14_x86_64.whl", hash = "sha256:36912fac1a6f65ed16589a50cc719dca3c0c2f14e90b8fac0edc3bcd061fb78e"},
-    {file = "semgrep-1.157.0-cp310.cp311.cp312.cp313.cp314.py310.py311.py312.py313.py314-none-macosx_11_0_arm64.whl", hash = "sha256:acbb72aaf4cd31a97dd1e83b6378f2cfa9956149a80ca1a85fd5d10374837187"},
-    {file = "semgrep-1.157.0-cp310.cp311.cp312.cp313.cp314.py310.py311.py312.py313.py314-none-manylinux2014_aarch64.whl", hash = "sha256:e98f1ad5406a631ba8b8df571b91f7675c4db530c69bd0599328afb336fa7779"},
-    {file = "semgrep-1.157.0-cp310.cp311.cp312.cp313.cp314.py310.py311.py312.py313.py314-none-manylinux2014_x86_64.whl", hash = "sha256:e9d6476d7db6cb9d5bbd9b8cb35c6b5d98ded53211495e54ed7adcaf010be7bd"},
-    {file = "semgrep-1.157.0-cp310.cp311.cp312.cp313.cp314.py310.py311.py312.py313.py314-none-musllinux_1_0_aarch64.whl", hash = "sha256:5f8469cc89595badb61080f6319cecade35a145eaf3b7347b1555e85dffcc0fc"},
-    {file = "semgrep-1.157.0-cp310.cp311.cp312.cp313.cp314.py310.py311.py312.py313.py314-none-musllinux_1_0_x86_64.whl", hash = "sha256:6617ed63b715c9e1c59a49fc0aca2a8c6bd39c71d9f7c99cba985d6f469a8d86"},
-    {file = "semgrep-1.157.0-cp310.cp311.cp312.cp313.cp314.py310.py311.py312.py313.py314-none-win_amd64.whl", hash = "sha256:89d53682655d7fff90ecfdd190a7e96085a41257fd32f3596460f86b52fe91a9"},
-    {file = "semgrep-1.157.0.tar.gz", hash = "sha256:d5496954d75c7d8a93955baed55160c19555af737e7f313b0bdfe39ebfb472b7"},
+    {file = "semgrep-1.158.0-cp310.cp311.cp312.cp313.cp314.py310.py311.py312.py313.py314-none-macosx_10_14_x86_64.whl", hash = "sha256:c6ee82c963a4303ddc2b6540621a322e6c04b7a3f9125669fdf3ec140e635f57"},
+    {file = "semgrep-1.158.0-cp310.cp311.cp312.cp313.cp314.py310.py311.py312.py313.py314-none-macosx_11_0_arm64.whl", hash = "sha256:bb75ee127378cdb692223a62e3316339f0ecf23b50e14ffc8218c9b202fb84a4"},
+    {file = "semgrep-1.158.0-cp310.cp311.cp312.cp313.cp314.py310.py311.py312.py313.py314-none-manylinux_2_35_aarch64.whl", hash = "sha256:6e03877218a96c7a7b9f2f9b8901e139f6968f895e7a9176fbe45464591abc6c"},
+    {file = "semgrep-1.158.0-cp310.cp311.cp312.cp313.cp314.py310.py311.py312.py313.py314-none-manylinux_2_35_x86_64.whl", hash = "sha256:60cf74a39265c88408a7d9e04f518a9e2e77eca9297693587d269a2a86ed70a5"},
+    {file = "semgrep-1.158.0-cp310.cp311.cp312.cp313.cp314.py310.py311.py312.py313.py314-none-musllinux_1_2_aarch64.whl", hash = "sha256:0ac9db59db1a92e5c8e3d3ca14a997b11d456b4c24a42aa89b02b881572d945d"},
+    {file = "semgrep-1.158.0-cp310.cp311.cp312.cp313.cp314.py310.py311.py312.py313.py314-none-musllinux_1_2_x86_64.whl", hash = "sha256:3d2b82dfbfdda532e7d91835b7c9659605b85eff667ff8d63b88c5433a153899"},
+    {file = "semgrep-1.158.0-cp310.cp311.cp312.cp313.cp314.py310.py311.py312.py313.py314-none-win_amd64.whl", hash = "sha256:7010614dc77d833eaf6e49d60d9adaadba24fcb1e8f4136631d045f0db0fd78e"},
+    {file = "semgrep-1.158.0.tar.gz", hash = "sha256:0855ecb5b60d30d7fd4834d4ac9f85af7a9b0d96792caaee7772462992e2c715"},
 ]
 
 [package.dependencies]
