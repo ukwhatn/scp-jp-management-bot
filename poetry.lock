@@ -1842,14 +1842,14 @@ files = [
 
 [[package]]
 name = "py-cord"
-version = "2.7.1"
+version = "2.7.2"
 description = "A Python wrapper for the Discord API"
 optional = false
 python-versions = "<3.14,>=3.10"
 groups = ["discord"]
 files = [
-    {file = "py_cord-2.7.1-py3-none-any.whl", hash = "sha256:d95301226f0642f6f3b23e21c31987ebbe23fdb7007cbc8143b010eb6780dec1"},
-    {file = "py_cord-2.7.1.tar.gz", hash = "sha256:100935f37e77ba8ac1e3eff0b180e6d69bcac083de81d4c83d42327d9a2eddee"},
+    {file = "py_cord-2.7.2-py3-none-any.whl", hash = "sha256:e25e5e9392f297b3d8fb8f9f31e57989276c1e2b12ebed5a7b1040dd5891d972"},
+    {file = "py_cord-2.7.2.tar.gz", hash = "sha256:86d2172c5b0de33d3aa5611d940dd98acfb1b95adfa10ae7b749e6aaf923ffff"},
 ]
 
 [package.dependencies]
